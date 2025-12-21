@@ -1,0 +1,2734 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The World of Coffee: Complete Guide - architecture-viewer</title>
+
+    <!-- Cytoscape.js and Dependencies -->
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+
+    <!-- Embedded Styles -->
+    <style>
+        /* Modern Architecture Visualization Styles with Theme Support */
+
+        /* Import fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
+        /* CSS Custom Properties - Light Theme (Default) */
+        :root {
+            /* Color Palette */
+            --primary-color: #667eea;
+            --primary-hover: #5a6fd8;
+            --primary-light: #e3f2fd;
+            --secondary-color: #6c757d;
+            --secondary-hover: #545b62;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --warning-color: #ffc107;
+            --warning-bg: #fff3cd;
+            --warning-border: #ffeaa7;
+            --warning-text: #856404;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+
+            /* Code Colors */
+            --code-bg: #2d3748;
+            --code-text: #e2e8f0;
+
+            /* Background Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --bg-overlay: rgba(0, 0, 0, 0.05);
+
+            /* Text Colors */
+            --text-primary: #2c3e50;
+            --text-secondary: #495057;
+            --text-tertiary: #6c757d;
+            --text-muted: #adb5bd;
+            --text-inverse: #ffffff;
+
+            /* Border Colors */
+            --border-color: #dee2e6;
+            --border-light: #e9ecef;
+            --border-dark: #adb5bd;
+
+            /* Shadow */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+            --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+            --shadow-color: rgba(0, 0, 0, 0.05);
+
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-full: 50px;
+
+            /* Typography */
+            --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-family-mono: 'JetBrains Mono', 'Courier New', monospace;
+            --font-size-xs: 0.75rem;
+            --font-size-sm: 0.875rem;
+            --font-size-base: 1rem;
+            --font-size-lg: 1.125rem;
+            --font-size-xl: 1.25rem;
+            --font-size-2xl: 1.5rem;
+            --font-size-3xl: 1.875rem;
+            --font-weight-normal: 400;
+            --font-weight-medium: 500;
+            --font-weight-semibold: 600;
+
+            /* Transitions */
+            --transition-base: 0.2s ease-out;
+
+            /* Grid */
+            --grid-color: rgba(102, 126, 234, 0.12);
+            --grid-size: 32px;
+        }
+
+        /* Dark Theme */
+        [data-theme='dark'] {
+            /* Color Palette */
+            --primary-color: #7c93f0;
+            --primary-hover: #6b82e8;
+            --primary-light: #1a202c;
+            --success-bg: #2d5a3d;
+            --success-text: #68d391;
+            --warning-bg: #744210;
+            --warning-border: #975a16;
+            --warning-text: #fbb040;
+
+            /* Code Colors */
+            --code-bg: #1a202c;
+            --code-text: #e2e8f0;
+
+            /* Background Colors */
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --bg-tertiary: #4a5568;
+            --bg-overlay: rgba(255, 255, 255, 0.05);
+
+            /* Text Colors */
+            --text-primary: #f7fafc;
+            --text-secondary: #e2e8f0;
+            --text-tertiary: #cbd5e0;
+            --text-muted: #a0aec0;
+
+            /* Border Colors */
+            --border-color: #4a5568;
+            --border-light: #2d3748;
+            --border-dark: #718096;
+
+            /* Shadow */
+            --shadow-color: rgba(0, 0, 0, 0.3);
+
+            /* Grid */
+            --grid-color: rgba(124, 147, 240, 0.15);
+        }
+
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-family-base);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            overflow: hidden;
+            line-height: 1.6;
+            font-weight: var(--font-weight-normal);
+            transition: background-color var(--transition-base), color var(--transition-base);
+        }
+
+        /* Typography */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            line-height: 1.25;
+            margin-bottom: var(--spacing-md);
+        }
+
+        h1 {
+            font-size: var(--font-size-3xl);
+        }
+
+        h2 {
+            font-size: var(--font-size-2xl);
+        }
+
+        h3 {
+            font-size: var(--font-size-xl);
+        }
+
+        h4 {
+            font-size: var(--font-size-lg);
+        }
+
+        h5 {
+            font-size: var(--font-size-base);
+        }
+
+        h6 {
+            font-size: var(--font-size-sm);
+        }
+
+        p {
+            margin-bottom: var(--spacing-md);
+            color: var(--text-secondary);
+        }
+
+        code,
+        pre {
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-sm);
+        }
+
+        code {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        pre {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Graph Area - 70% */
+        .graph-container {
+            width: 70%;
+            height: 100vh;
+            position: relative;
+            background: var(--bg-primary);
+            border-right: 2px solid var(--border-color);
+            transition: background-color var(--transition-base), border-color var(--transition-base);
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-secondary);
+            background-image:
+                linear-gradient(0deg, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+            background-position: 0 0, 0 0;
+            transition: background-color var(--transition-base);
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            top: var(--spacing-lg);
+            left: var(--spacing-lg);
+            right: 80px;
+            /* Leave space for theme toggle (48px + 24px margin) */
+            z-index: 1000;
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        /* Button Styles */
+        .btn {
+            background: var(--primary-color);
+            color: var(--text-inverse);
+            border: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-medium);
+            transition: all var(--transition-base);
+            box-shadow: var(--shadow-sm);
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--info-color);
+        }
+
+        .btn-docs {
+            background: var(--success-color);
+        }
+
+        /* Sidebar - 30% */
+        .sidebar {
+            width: 30%;
+            height: 100vh;
+            background: var(--bg-secondary);
+            padding: var(--spacing-md);
+            overflow-y: auto;
+            border-left: 1px solid var(--border-color);
+            transition: background-color var(--transition-base), border-color var(--transition-base);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-dark);
+            border-radius: var(--radius-sm);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+
+        .sidebar h2 {
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .sidebar h3 {
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-sm);
+            font-size: var(--font-size-base);
+            font-weight: var(--font-weight-medium);
+        }
+
+        /* Card Styles */
+        .component-details,
+        .card {
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-md);
+            border: 1px solid var(--border-color);
+            transition: all var(--transition-base);
+        }
+
+        .component-details:hover,
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+
+        .detail-section {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
+            display: block;
+            font-size: var(--font-size-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .signature {
+            background: var(--bg-tertiary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--primary-color);
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-sm);
+            white-space: pre-wrap;
+            overflow-x: auto;
+            color: var(--text-primary);
+            transition: background-color var(--transition-base);
+        }
+
+        .working-description {
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .imports-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+        }
+
+        .imports-list li {
+            background: var(--primary-light);
+            color: var(--primary-color);
+            margin: 0;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-full);
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
+            border: 1px solid var(--primary-color);
+            transition: all var(--transition-fast);
+        }
+
+        .imports-list li:hover {
+            background: var(--primary-color);
+            color: var(--text-inverse);
+        }
+
+        /* I/O Summary Styles */
+        .io-summary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+            transition: background-color var(--transition-base);
+        }
+
+        .io-quick {
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            margin-bottom: var(--spacing-sm);
+            line-height: 1.4;
+        }
+
+        .io-quick:last-child {
+            margin-bottom: 0;
+        }
+
+        .io-quick strong {
+            color: var(--text-primary);
+            font-weight: var(--font-weight-semibold);
+        }
+
+        /* I/O List Styles */
+        .io-list {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+            transition: background-color var(--transition-base);
+        }
+
+        .io-item {
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .io-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .io-name {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            font-family: var(--font-family-mono);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .io-format {
+            background: var(--info-color);
+            color: var(--text-inverse);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
+            margin-left: var(--spacing-sm);
+            font-family: var(--font-family-mono);
+        }
+
+        .io-description {
+            color: var(--text-tertiary);
+            font-size: var(--font-size-sm);
+            line-height: 1.4;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .io-example {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+            margin-top: var(--spacing-xs);
+            transition: background-color var(--transition-base);
+        }
+
+        .tech-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-sm);
+        }
+
+        .tech-badge {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-xs);
+            font-weight: var(--font-weight-medium);
+            border: 1px solid var(--border-color);
+            transition: all var(--transition-fast);
+        }
+
+        .tech-badge:hover {
+            background: var(--primary-color);
+            color: var(--text-inverse);
+            border-color: var(--primary-color);
+        }
+
+        .responsibilities-list {
+            margin: var(--spacing-sm) 0 0 0;
+            padding-left: var(--spacing-lg);
+        }
+
+        .responsibilities-list li {
+            color: var(--text-tertiary);
+            margin-bottom: var(--spacing-xs);
+            line-height: 1.4;
+        }
+
+        .endpoints-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .endpoint-url {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            word-break: break-all;
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h3 {
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .breadcrumb {
+            background: var(--bg-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .breadcrumb-item {
+            display: inline;
+            color: var(--text-tertiary);
+        }
+
+        .breadcrumb-item+.breadcrumb-item::before {
+            content: " > ";
+            margin: 0 var(--spacing-sm);
+            color: var(--text-muted);
+        }
+
+        .breadcrumb-item.active {
+            color: var(--primary-color);
+            font-weight: var(--font-weight-medium);
+        }
+
+        /* Loading and Empty States */
+        .empty-state {
+            text-align: center;
+            color: var(--text-tertiary);
+            padding: var(--spacing-lg) var(--spacing-md);
+        }
+
+        .empty-state h3 {
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-sm);
+            font-size: var(--font-size-base);
+        }
+
+        .empty-state p {
+            font-size: var(--font-size-xs);
+            line-height: 1.4;
+            color: var(--text-tertiary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--primary-color);
+        }
+
+        /* Project Header */
+        .project-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: var(--text-inverse);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            transition: background var(--transition-base);
+        }
+
+        .project-title {
+            font-size: var(--font-size-lg);
+            margin-bottom: var(--spacing-xs);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-inverse);
+        }
+
+        .project-description {
+            opacity: 0.9;
+            font-size: var(--font-size-xs);
+            color: var(--text-inverse);
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: fixed;
+            top: var(--spacing-lg);
+            right: var(--spacing-lg);
+            z-index: 2000;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-full);
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-base);
+            box-shadow: var(--shadow-md);
+            font-size: var(--font-size-lg);
+        }
+
+        .theme-toggle:hover {
+            background: var(--primary-color);
+            color: var(--text-inverse);
+            border-color: var(--primary-color);
+            transform: scale(1.1);
+        }
+
+        /* Node Details Popup */
+        .node-details-popup {
+            position: absolute;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-xl);
+            z-index: 2000;
+            max-width: 400px;
+            display: none;
+            font-family: var(--font-family-base);
+            transition: all var(--transition-base);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .graph-container {
+                width: 100%;
+                height: 60vh;
+                border-right: none;
+                border-bottom: 2px solid var(--border-color);
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 40vh;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .controls {
+                position: relative;
+                top: var(--spacing-md);
+                left: var(--spacing-md);
+                margin-bottom: var(--spacing-md);
+                flex-wrap: wrap;
+            }
+
+            .theme-toggle {
+                top: var(--spacing-md);
+                right: var(--spacing-md);
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                gap: var(--spacing-xs);
+            }
+
+            .btn {
+                padding: var(--spacing-xs) var(--spacing-sm);
+                font-size: var(--font-size-xs);
+            }
+
+            .sidebar {
+                padding: var(--spacing-sm);
+            }
+
+            .sidebar h2 {
+                font-size: var(--font-size-base);
+            }
+
+            .sidebar h3 {
+                font-size: var(--font-size-sm);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Context Menu Styles */
+        #context-menu {
+            display: none;
+            position: absolute;
+            z-index: 10000;
+            width: 220px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            font-family: var(--font-family-base);
+            font-size: var(--font-size-sm);
+            overflow: hidden;
+            animation: fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(8px);
+        }
+
+        [data-theme='dark'] #context-menu {
+            background: rgba(30, 41, 59, 0.95);
+        }
+
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: var(--font-weight-medium);
+        }
+
+        .context-menu-item:hover {
+            background: var(--primary-light);
+            color: var(--primary-color);
+        }
+
+        [data-theme='dark'] .context-menu-item:hover {
+            background: rgba(129, 140, 248, 0.1);
+        }
+
+        .context-menu-item.danger {
+            color: var(--danger-color);
+        }
+
+        .context-menu-item.danger:hover {
+            background: #fff5f5;
+        }
+
+        /* Connection Mode Styles */
+        .connection-source {
+            border-width: 4px;
+            border-color: var(--warning-color);
+            border-style: dashed;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <span class="theme-icon">☀️</span>
+    </button>
+
+    <div class="container">
+        <!-- Graph Area (70%) -->
+        <div class="graph-container">
+            <!-- Controls -->
+            <div class="controls">
+                <button id="expand-all" class="btn">📂 Expand All</button>
+                <button id="collapse-all" class="btn btn-secondary">📁 Collapse All</button>
+                <button id="drill-down" class="btn btn-secondary">⬇️ Drill Down</button>
+                <button id="drill-up" class="btn btn-secondary">⬆️ Drill Up</button>
+                <button id="fit-view" class="btn btn-secondary">🎯 Fit View</button>
+                <button id="add-node" class="btn btn-secondary">➕ Add Node</button>
+                <button id="toggle-docs" class="btn btn-docs">📚 Full Documentation</button>
+            </div>
+
+            <!-- Cytoscape Container -->
+            <div id="cy"></div>
+        </div>
+
+        <!-- Context Menu -->
+        <div id="context-menu">
+            <div class="context-menu-item node-action" data-action="connect">
+                <span>🔗</span> Connect to...
+            </div>
+            <div class="context-menu-item node-action" data-action="rename">
+                <span>✏️</span> Rename
+            </div>
+            <div class="context-menu-item node-action" data-action="edit-desc">
+                <span>📝</span> Edit Description
+            </div>
+            <div class="context-menu-item node-action danger" data-action="remove-edge">
+                <span>✂️</span> Remove Connection
+            </div>
+            <div class="context-menu-item node-action danger" data-action="remove-node">
+                <span>🗑️</span> Remove Node
+            </div>
+            <div class="context-menu-item bg-action" data-action="add-node" style="display: none;">
+                <span>➕</span> Add New Node
+            </div>
+        </div>
+
+        <!-- Sidebar (30%) -->
+        <div class="sidebar">
+            <!-- Project Information -->
+            <div id="project-info">
+                <!-- Will be populated by JavaScript -->
+            </div>
+
+            <!-- Navigation Breadcrumb -->
+            <div class="breadcrumb">
+                <span class="breadcrumb-item active">Root</span>
+            </div>
+
+            <!-- Component Details -->
+            <div id="component-details">
+                <div class="empty-state">
+                    <h3>Component Explorer</h3>
+                    <p>Hover over a component to see its details, or click to explore its structure.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embedded JavaScript -->
+    <script>
+        // Architecture Visualization with Cytoscape.js
+
+        // Register Dagre extension
+        if (typeof cytoscape !== 'undefined' && typeof cytoscapeDagre !== 'undefined') {
+            cytoscape.use(cytoscapeDagre);
+        } else if (typeof window !== 'undefined') {
+            // Wait for libraries to load
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof cytoscape !== 'undefined' && typeof cytoscapeDagre !== 'undefined') {
+                    cytoscape.use(cytoscapeDagre);
+                }
+            });
+        }
+
+        class ArchitectureViewer {
+            constructor(containerId, data) {
+                this.container = document.getElementById(containerId);
+                this.architectureData = data;
+                this.cy = null;
+                this.state = {
+                    hoveredNode: null,
+                    selectedNode: null,
+                    visibleNodes: new Set(),
+                    navigationPath: ['root'],
+                    currentLevel: 0,
+                    maxLevel: 0,
+                    contextMenuTarget: null,
+                    contextMenuPosition: null
+                };
+
+                // Connection Mode State
+                this.connectionMode = {
+                    active: false,
+                    sourceNode: null
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.setupCytoscape();
+                this.setupEventHandlers();
+                this.setupContextMenuHandlers(); // Initialize context menu
+                this.calculateMaxLevel(); // Calculate the maximum hierarchy depth
+                this.initialLayout();
+                this.updateProjectHeader();
+            }
+
+            setupCytoscape() {
+                // Process data for Cytoscape
+                const elements = this.processArchitectureData();
+
+                this.cy = cytoscape({
+                    container: this.container,
+                    elements: elements,
+                    style: this.getStylesheet(),
+                    layout: { name: 'grid' }, // Will be replaced with proper layout
+
+                    // Simple, clean settings - no fancy stuff
+                    minZoom: 0.1,
+                    maxZoom: 3,
+                    zoomingEnabled: true,
+                    panningEnabled: true,
+                    boxSelectionEnabled: false,
+                    selectionType: 'single',
+                    autoungrabify: false,
+                    autounselectify: false
+                });
+            }
+
+            processArchitectureData() {
+                const nodes = this.architectureData.nodes.map(node => ({
+                    group: 'nodes',
+                    data: {
+                        id: node.id,
+                        label: node.data.label,
+                        type: node.data.type || 'default',
+                        // Include ALL node data for detailed summaries
+                        description: node.data.description,
+                        summary: node.data.summary,
+                        keyPrinciples: node.data.keyPrinciples,
+                        keyFunctions: node.data.keyFunctions,
+                        keyResponsibilities: node.data.keyResponsibilities,
+                        keyFeatures: node.data.keyFeatures,
+                        keyPowers: node.data.keyPowers,
+                        powers: node.data.powers,
+                        functions: node.data.functions,
+                        historicalContext: node.data.historicalContext,
+                        selectionMethod: node.data.selectionMethod,
+                        accountability: node.data.accountability,
+                        termLength: node.data.termLength,
+                        composition: node.data.composition,
+                        principle: node.data.principle,
+                        structure: node.data.structure,
+                        sovereignty: node.data.sovereignty,
+                        representation: node.data.representation,
+                        specialPowers: node.data.specialPowers,
+                        jurisdiction: node.data.jurisdiction,
+                        independence: node.data.independence,
+                        specialization: node.data.specialization,
+                        requirements: node.data.requirements,
+                        significance: node.data.significance,
+                        democraticRole: node.data.democraticRole,
+                        keyComponents: node.data.keyComponents,
+                        keyElements: node.data.keyElements,
+                        protectedRights: node.data.protectedRights,
+                        purpose: node.data.purpose,
+                        enforcement: node.data.enforcement,
+                        types: node.data.types,
+                        considerations: node.data.considerations,
+                        impact: node.data.impact,
+                        advantages: node.data.advantages,
+                        mechanisms: node.data.mechanisms,
+                        variants: node.data.variants,
+                        characteristics: node.data.characteristics,
+                        effects: node.data.effects,
+                        mechanics: node.data.mechanics,
+                        controversies: node.data.controversies,
+                        process: node.data.process,
+                        benefits: node.data.benefits,
+                        concerns: node.data.concerns,
+                        methods: node.data.methods,
+                        regulation: node.data.regulation,
+                        balance: node.data.balance,
+                        implementation: node.data.implementation,
+                        importance: node.data.importance,
+                        challenges: node.data.challenges,
+                        protection: node.data.protection,
+                        branches: node.data.branches,
+                        mechanism: node.data.mechanism,
+                        examples: node.data.examples,
+                        operation: node.data.operation,
+                        effect: node.data.effect,
+                        // Vitamin-specific fields
+                        richestFoods: node.data.richestFoods,
+                        richFoods: node.data.richFoods,
+                        deficiencySymptoms: node.data.deficiencySymptoms,
+                        deficiency: node.data.deficiency,
+                        dailyRequirement: node.data.dailyRequirement,
+                        specialConsiderations: node.data.specialConsiderations,
+                        details: this.architectureData.details[node.id] || {}
+                    },
+                    classes: node.data.type || 'default'
+                }));
+
+                const edges = this.architectureData.edges.map(edge => ({
+                    group: 'edges',
+                    data: {
+                        id: `${edge.source}-${edge.target}`,
+                        source: edge.source,
+                        target: edge.target
+                    }
+                }));
+
+                return [...nodes, ...edges];
+            }
+
+            getStylesheet() {
+                return [
+                    // Base node styles with better text accommodation
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#66BB6A',
+                            'label': 'data(label)',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'color': '#fff',
+                            'font-size': '11px', // Normal readable size
+                            'font-weight': '600',
+                            'font-family': 'Inter, sans-serif',
+                            'width': '85px', // Increased from 70px to better fit text
+                            'height': '85px', // Increased from 70px
+                            'border-width': '2px', // Normal border
+                            'border-color': '#4CAF50',
+                            'text-wrap': 'wrap',
+                            'text-max-width': '80px', // Adjusted for larger nodes
+                            'overlay-opacity': 0,
+                            'transition-property': 'background-color, border-color, border-width',
+                            'transition-duration': '0.3s',
+                            'shape': 'round-rectangle'
+                        }
+                    },
+
+                    // TYPE-SPECIFIC STYLES with better text accommodation
+                    {
+                        selector: 'node.application',
+                        style: {
+                            'background-color': '#2196F3',
+                            'border-color': '#1976D2',
+                            'width': '95px', // Increased for main applications
+                            'height': '95px',
+                            'font-size': '12px'
+                        }
+                    },
+
+                    {
+                        selector: 'node.backend',
+                        style: {
+                            'background-color': '#FF5722',
+                            'border-color': '#D84315',
+                            'shape': 'round-rectangle'
+                        }
+                    },
+
+                    {
+                        selector: 'node.component',
+                        style: {
+                            'background-color': '#9C27B0',
+                            'border-color': '#7B1FA2'
+                        }
+                    },
+
+                    {
+                        selector: 'node.entry',
+                        style: {
+                            'background-color': '#FF9800',
+                            'border-color': '#F57C00',
+                            'shape': 'diamond',
+                            'width': '90px', // Increased for better text fit
+                            'height': '90px'
+                        }
+                    },
+
+                    {
+                        selector: 'node.frontend',
+                        style: {
+                            'background-color': '#4CAF50',
+                            'border-color': '#388E3C',
+                            'shape': 'round-rectangle'
+                        }
+                    },
+
+                    {
+                        selector: 'node.database',
+                        style: {
+                            'background-color': '#795548',
+                            'border-color': '#5D4037',
+                            'shape': 'barrel',
+                            'width': '90px', // Increased for better text fit
+                            'height': '90px'
+                        }
+                    },
+
+                    {
+                        selector: 'node.data',
+                        style: {
+                            'background-color': '#607D8B',
+                            'border-color': '#455A64',
+                            'shape': 'barrel'
+                        }
+                    },
+
+                    {
+                        selector: 'node.utility',
+                        style: {
+                            'background-color': '#607D8B',
+                            'border-color': '#455A64',
+                            'shape': 'hexagon'
+                        }
+                    },
+
+                    // SUBTLE HOVER AND INTERACTION STATES
+                    {
+                        selector: 'node.highlighted',
+                        style: {
+                            'border-width': '3px',
+                            'border-color': '#FFC107', // Subtle yellow highlight
+                            'transition-duration': '0.2s'
+                        }
+                    },
+
+                    {
+                        selector: 'node:hover',
+                        style: {
+                            'border-width': '3px'
+                        }
+                    },
+
+                    {
+                        selector: 'node:active',
+                        style: {
+                            'overlay-opacity': 0.1,
+                            'overlay-color': '#000'
+                        }
+                    },
+
+                    {
+                        selector: 'node:selected',
+                        style: {
+                            'border-width': '4px',
+                            'border-color': '#333'
+                        }
+                    },
+
+                    // ENHANCED EDGE STYLES with better visibility
+                    {
+                        selector: 'edge',
+                        style: {
+                            'curve-style': 'bezier', // Curved edges for better readability
+                            'target-arrow-shape': 'triangle',
+                            'line-color': '#666666', // Lighter color for better visibility
+                            'target-arrow-color': '#666666',
+                            'width': '3px', // 🔧 THICKER LINES (was 2px)
+                            'target-arrow-size': '15px', // 🔧 BIGGER ARROWS (was 10px)
+                            'arrow-scale': 1.5, // 🔧 LARGER ARROW SCALE (was 1.2)
+                            'control-point-step-size': '40px', // Normal curve control
+                            'overlay-opacity': 0,
+                            'opacity': 1, // Full opacity for clear visibility
+                            'transition-property': 'line-color, target-arrow-color, width, opacity',
+                            'transition-duration': '0.3s'
+                        }
+                    },
+
+                    // Edge type-specific styles with normal colors
+                    {
+                        selector: 'edge.dependency',
+                        style: {
+                            'line-color': '#2196F3',
+                            'target-arrow-color': '#2196F3'
+                        }
+                    },
+
+                    {
+                        selector: 'edge.uses',
+                        style: {
+                            'line-color': '#4CAF50',
+                            'target-arrow-color': '#4CAF50',
+                            'line-style': 'dashed',
+                            'line-dash-pattern': [6, 3]
+                        }
+                    },
+
+                    {
+                        selector: 'edge.contains',
+                        style: {
+                            'line-color': '#9C27B0',
+                            'target-arrow-color': '#9C27B0',
+                            'width': '3px' // Slightly thicker for containment
+                        }
+                    },
+
+                    {
+                        selector: 'edge.connects',
+                        style: {
+                            'line-color': '#FF9800',
+                            'target-arrow-color': '#FF9800'
+                        }
+                    },
+
+                    // Subtle highlighted edges
+                    {
+                        selector: 'edge.highlighted',
+                        style: {
+                            'line-color': '#FFC107',
+                            'target-arrow-color': '#FFC107',
+                            'width': '3px',
+                            'opacity': 1,
+                            'transition-duration': '0.2s'
+                        }
+                    },
+
+                    // Edge hover effects
+                    {
+                        selector: 'edge:hover',
+                        style: {
+                            'width': '3px',
+                            'opacity': 1
+                        }
+                    },
+
+                    // Dimmed elements for interactive highlighting
+                    {
+                        selector: '.dimmed',
+                        style: {
+                            'opacity': 0.25
+                        }
+                    },
+
+                    // Hidden elements
+                    {
+                        selector: '.hidden',
+                        style: {
+                            'display': 'none'
+                        }
+                    }
+                ];
+            }
+
+            setupEventHandlers() {
+                // Subtle node hover highlighting without dimming others
+                this.cy.on('mouseover', 'node', (event) => {
+                    const node = event.target;
+
+                    // Just highlight the hovered node subtly
+                    node.addClass('highlighted');
+
+                    // Also handle component details
+                    this.handleNodeHover(node);
+
+                    // Show enhanced tooltip
+                    this.showNodeTooltip(node, event);
+                });
+
+                this.cy.on('mouseout', 'node', (event) => {
+                    const node = event.target;
+
+                    // Remove highlighting from the node
+                    node.removeClass('highlighted');
+
+                    // Clear other highlights
+                    this.clearHighlights();
+                    this.hideTooltips();
+                });
+
+                // Simple edge hover effects without dimming
+                this.cy.on('mouseover', 'edge', (event) => {
+                    const edge = event.target;
+
+                    // Just highlight the edge
+                    edge.addClass('highlighted');
+
+                    this.showEdgeTooltip(edge, event);
+                });
+
+                this.cy.on('mouseout', 'edge', (event) => {
+                    const edge = event.target;
+                    edge.removeClass('highlighted');
+                    this.hideTooltips();
+                });
+
+                // Node click with enhanced interaction
+                this.cy.on('tap', 'node', (event) => {
+                    const node = event.target;
+
+                    // If in connection mode, handle connection
+                    if (this.connectionMode.active) {
+                        this.completeConnection(node);
+                    } else {
+                        this.handleNodeClick(node);
+                    }
+                });
+
+                // Context Menu Event (Right-Click)
+                this.cy.on('cxttap', 'node', (event) => {
+                    this.showContextMenu(event.target, event.originalEvent, false);
+                });
+
+                // Background Context Menu
+                this.cy.on('cxttap', (event) => {
+                    if (event.target === this.cy) {
+                        this.showContextMenu(null, event.originalEvent, true);
+                    }
+                });
+
+                // Background click
+                this.cy.on('tap', (event) => {
+                    if (event.target === this.cy) {
+                        this.clearSelection();
+                        this.hideContextMenu(); // Hide context menu on background click
+                    }
+                });
+
+                // Enhanced keyboard shortcuts
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'r' || event.key === 'R') {
+                        this.applyLayout();
+                    } else if (event.key === 'f' || event.key === 'F') {
+                        this.cy.fit(null, 50);
+                    } else if (event.key === 'Escape') {
+                        this.cy.elements().removeClass('dimmed highlighted connected');
+                        this.hideTooltips();
+                        this.clearSelection();
+                    } else if (event.key === 'c' || event.key === 'C') {
+                        this.cy.center();
+                    }
+                });
+
+                // Add Node Button
+                const addNodeBtn = document.getElementById('add-node');
+                if (addNodeBtn) {
+                    addNodeBtn.addEventListener('click', () => {
+                        this.promptAddNode();
+                    });
+                }
+            }
+
+            handleNodeHover(node) {
+                this.state.hoveredNode = node;
+
+                // Highlight connected elements
+                const connectedEdges = node.connectedEdges();
+                connectedEdges.addClass('highlighted');
+
+                // Update sidebar
+                this.updateSidebar(node);
+            }
+
+            handleNodeClick(node) {
+                this.state.selectedNode = node;
+
+                // Check if node has children in hierarchy
+                const nodeId = node.id();
+                const children = this.architectureData.hierarchy[nodeId];
+
+                if (children && children.length > 0) {
+                    this.toggleNodeChildren(node, children);
+                }
+
+                // Update sidebar with permanent selection
+                this.updateSidebar(node);
+            }
+
+            toggleNodeChildren(parentNode, childrenIds) {
+                const parentId = parentNode.id();
+
+                // Check if children are currently visible
+                const firstChild = this.cy.getElementById(childrenIds[0]);
+                const areChildrenVisible = firstChild.length > 0 && !firstChild.hasClass('hidden');
+
+                if (areChildrenVisible) {
+                    // Hide children
+                    this.hideNodeChildren(childrenIds);
+                } else {
+                    // Show children
+                    this.showNodeChildren(childrenIds);
+                }
+
+                // Re-layout after visibility changes
+                this.applyLayout();
+            }
+
+            showNodeChildren(childrenIds) {
+                childrenIds.forEach(childId => {
+                    const childNode = this.cy.getElementById(childId);
+                    if (childNode.length > 0) {
+                        childNode.removeClass('hidden');
+                        this.state.visibleNodes.add(childId);
+                    }
+                });
+            }
+
+            hideNodeChildren(childrenIds) {
+                // Recursively hide children and their descendants
+                const toHide = new Set();
+
+                const addDescendants = (nodeId) => {
+                    toHide.add(nodeId);
+                    const children = this.architectureData.hierarchy[nodeId] || [];
+                    children.forEach(addDescendants);
+                };
+
+                childrenIds.forEach(addDescendants);
+
+                toHide.forEach(nodeId => {
+                    const node = this.cy.getElementById(nodeId);
+                    if (node.length > 0) {
+                        node.addClass('hidden');
+                        this.state.visibleNodes.delete(nodeId);
+                    }
+                });
+            }
+
+            clearHighlights() {
+                this.cy.edges().removeClass('highlighted');
+                if (!this.state.selectedNode) {
+                    this.updateSidebar(null);
+                }
+            }
+
+            clearSelection() {
+                this.state.selectedNode = null;
+                this.updateSidebar(null);
+            }
+
+            // --- Context Menu & Editing Methods ---
+
+            setupContextMenuHandlers() {
+                const menu = document.getElementById('context-menu');
+                if (!menu) return;
+
+                // Hide menu on any click elsewhere
+                document.addEventListener('click', (e) => {
+                    if (!menu.contains(e.target)) {
+                        this.hideContextMenu();
+                    }
+                });
+
+                // Helper to find action element
+                const getActionElement = (el) => {
+                    while (el && el !== menu) {
+                        if (el.classList.contains('context-menu-item')) return el;
+                        el = el.parentElement;
+                    }
+                    return null;
+                };
+
+                // Single event listener for the menu
+                menu.addEventListener('click', (e) => {
+                    const item = getActionElement(e.target);
+                    if (!item) return;
+
+                    const action = item.dataset.action;
+                    const isBackground = item.classList.contains('bg-action');
+
+                    if (isBackground) {
+                        this.handleBackgroundAction(action, this.state.contextMenuPosition);
+                    } else if (this.state.contextMenuTarget) {
+                        this.handleContextAction(action, this.state.contextMenuTarget);
+                    }
+
+                    this.hideContextMenu();
+                });
+            }
+
+            showContextMenu(target, event, isBackground = false) {
+                const menu = document.getElementById('context-menu');
+                if (!menu) return;
+
+                event.preventDefault(); // update: prevent default browser context menu
+
+                // Position the menu
+                const x = event.clientX;
+                const y = event.clientY;
+
+                menu.style.left = `${x}px`;
+                menu.style.top = `${y}px`;
+                menu.style.display = 'block'; // Ensure it's visible for positioning
+
+                // Store state
+                this.state.contextMenuTarget = target;
+
+                // For background clicks, we need the raw position relative to the window
+                // but for addNode we might need to calculate graph coordinates later
+                this.state.contextMenuPosition = { x, y };
+
+                // Show/Hide items based on context (Node vs Background)
+                const nodeItems = menu.querySelectorAll('.node-action');
+                const bgItems = menu.querySelectorAll('.bg-action');
+
+                if (isBackground) {
+                    nodeItems.forEach(el => el.style.display = 'none');
+                    bgItems.forEach(el => el.style.display = 'block');
+                } else {
+                    nodeItems.forEach(el => el.style.display = 'block');
+                    bgItems.forEach(el => el.style.display = 'none');
+                }
+
+                // Trigger reflow for transition
+                menu.offsetHeight;
+                menu.style.opacity = '1';
+            }
+
+            hideContextMenu() {
+                const menu = document.getElementById('context-menu');
+                if (!menu) return;
+
+                menu.style.opacity = '0';
+                setTimeout(() => {
+                    if (menu.style.opacity === '0') {
+                        menu.style.display = 'none';
+                    }
+                }, 300);
+            }
+
+            handleBackgroundAction(action, position) {
+                if (action === 'add-node') {
+                    // Convert rendered position (clientX/Y) to model position
+                    // We need to account for container offset and zoom/pan
+                    const pan = this.cy.pan();
+                    const zoom = this.cy.zoom();
+                    const container = this.cy.container();
+                    const rect = container.getBoundingClientRect();
+
+                    const modelPos = {
+                        x: (position.x - rect.left - pan.x) / zoom,
+                        y: (position.y - rect.top - pan.y) / zoom
+                    };
+
+                    this.promptAddNode(modelPos);
+                }
+            }
+
+            handleContextAction(action, node) {
+                // Ensure we have the element, not just the ID if passed
+                if (typeof node === 'string') {
+                    node = this.cy.getElementById(node);
+                }
+
+                switch (action) {
+                    case 'connect':
+                        this.startConnectionMode(node);
+                        break;
+                    case 'rename':
+                        this.promptRenameNode({ nodeId: node.id(), currentLabel: node.data('label') });
+                        break;
+                    case 'edit-desc':
+                        this.promptEditDescription(node);
+                        break;
+                    case 'remove-edge':
+                        this.promptRemoveConnection(node);
+                        break;
+                    case 'remove-node':
+                        this.promptRemoveNode(node);
+                        break;
+                }
+            }
+
+            promptAddNode(position = null) {
+                // Auto-generate ID based on timestamp
+                const id = 'node_' + Date.now();
+
+                const label = prompt("Enter Node Label (e.g., 'New Component'):", "New Node");
+                if (!label) return;
+
+                const description = prompt("Enter Description:", "A new added node.");
+
+                this.addNode({
+                    id: id,
+                    label: label,
+                    description: description,
+                    position: position // Pass position if available
+                });
+            }
+
+            addNode(nodeInfo) {
+                // Add to internal data model
+                const newNode = {
+                    id: nodeInfo.id,
+                    data: {
+                        label: nodeInfo.label,
+                        type: 'default',
+                        description: nodeInfo.description,
+                        summary: nodeInfo.description
+                    }
+                };
+                this.architectureData.nodes.push(newNode);
+
+                // Add to Cytoscape
+                const cyNode = {
+                    group: 'nodes',
+                    data: newNode.data,
+                    position: nodeInfo.position ? nodeInfo.position : { x: 0, y: 0 },
+                    classes: 'default'
+                };
+
+                this.cy.add(cyNode);
+
+                // Apply layout ONLY if no position was provided, otherwise we want it to stay where placed
+                if (!nodeInfo.position) {
+                    this.applyLayout();
+                }
+
+                // Select the new node
+                const addedNode = this.cy.getElementById(newNode.id);
+                this.handleNodeClick(addedNode);
+                if (!nodeInfo.position) {
+                    this.cy.center(addedNode);
+                }
+            }
+
+            promptRenameNode(detail) {
+                const nodeId = detail.nodeId || detail; // Handle object or string
+                const node = this.cy.getElementById(nodeId);
+                if (node.length === 0) return;
+
+                const currentLabel = node.data('label');
+                const newLabel = prompt("Rename Node:", currentLabel);
+
+                if (newLabel && newLabel !== currentLabel) {
+                    node.data('label', newLabel);
+                    // Update internal data
+                    this.updateNodeData(nodeId, { label: newLabel });
+                    // Update sidebar if visible
+                    if (this.state.selectedNode && this.state.selectedNode.id() === nodeId) {
+                        this.updateSidebar(node);
+                    }
+                }
+            }
+
+            promptEditDescription(node) {
+                const currentDesc = node.data('description') || "";
+                const newDesc = prompt("Edit Description:", currentDesc);
+
+                if (newDesc !== null) {
+                    node.data('description', newDesc);
+                    this.updateNodeData(node.id(), { description: newDesc, summary: newDesc });
+                    // Update sidebar if visible
+                    if (this.state.selectedNode && this.state.selectedNode.id() === node.id()) {
+                        this.updateSidebar(node);
+                    }
+                }
+            }
+
+            startConnectionMode(sourceNode) {
+                this.connectionMode = {
+                    active: true,
+                    sourceNode: sourceNode
+                };
+
+                sourceNode.addClass('connection-source');
+                this.cy.container().style.cursor = 'crosshair';
+
+                // Show notification (using simple alert for now, could be improved)
+                alert(`Select a target node to connect from "${sourceNode.data('label')}"`);
+            }
+
+            completeConnection(targetNode) {
+                if (!this.connectionMode.active) return;
+
+                const sourceNode = this.connectionMode.sourceNode;
+
+                // Prevent self-loops if needed
+                if (sourceNode.id() === targetNode.id()) {
+                    alert("Cannot connect a node to itself.");
+                    this.clearConnectionMode();
+                    return;
+                }
+
+                // Add edge
+                this.addEdge(sourceNode.id(), targetNode.id());
+
+                this.clearConnectionMode();
+            }
+
+            clearConnectionMode() {
+                if (this.connectionMode.sourceNode) {
+                    this.connectionMode.sourceNode.removeClass('connection-source');
+                }
+                this.connectionMode = { active: false, sourceNode: null };
+                this.cy.container().style.cursor = 'default';
+            }
+
+            addEdge(sourceId, targetId) {
+                const edgeId = `e-${sourceId}-${targetId}-${Date.now()}`;
+
+                // Check if edge already exists
+                if (this.cy.edges(`[source = "${sourceId}"][target = "${targetId}"]`).length > 0) {
+                    alert("Connection already exists!");
+                    return;
+                }
+
+                const newEdge = {
+                    group: 'edges',
+                    data: {
+                        id: edgeId,
+                        source: sourceId,
+                        target: targetId,
+                        type: 'connects'
+                    },
+                    classes: 'connects'
+                };
+
+                this.cy.add(newEdge);
+
+                // Update internal data
+                this.architectureData.edges.push({
+                    id: edgeId,
+                    source: sourceId,
+                    target: targetId
+                });
+
+                // Re-run layout to accommodate new edge (optional, might disturb view)
+                // this.applyLayout(); 
+            }
+
+            promptRemoveConnection(node) {
+                // Find connected edges
+                const edges = node.connectedEdges();
+                if (edges.length === 0) {
+                    alert("No connections to remove.");
+                    return;
+                }
+
+                // Build numbered list for prompt
+                let edgeList = `Select connection to remove from "${node.data('label')}":\n\n`;
+                const edgeArray = [];
+
+                edges.forEach((edge, index) => {
+                    const otherNode = edge.source().id() === node.id() ? edge.target() : edge.source();
+                    const direction = edge.source().id() === node.id() ? '→' : '←';
+                    edgeList += `${index + 1}. ${direction} ${otherNode.data('label')}\n`;
+                    edgeArray.push(edge);
+                });
+
+                edgeList += `\nEnter number (1-${edges.length}) or press Cancel:`;
+
+                const input = prompt(edgeList);
+                if (input) {
+                    const selectedIndex = parseInt(input) - 1;
+                    if (selectedIndex >= 0 && selectedIndex < edges.length) {
+                        const edgeToRemove = edgeArray[selectedIndex];
+                        this.cy.remove(edgeToRemove);
+                        // Update internal data
+                        this.architectureData.edges = this.architectureData.edges.filter(e => e.id !== edgeToRemove.id());
+                        alert("Connection removed successfully!");
+                    } else {
+                        alert("Invalid selection.");
+                    }
+                }
+            }
+
+            promptRemoveNode(node) {
+                const label = node.data('label');
+                if (confirm(`Are you sure you want to delete the node "${label}" and all its connections?`)) {
+                    this.removeNode(node);
+                }
+            }
+
+            removeNode(node) {
+                const nodeId = node.id();
+
+                // Remove from internal data model - Nodes
+                this.architectureData.nodes = this.architectureData.nodes.filter(n => n.id !== nodeId);
+
+                // Remove from internal data model - Edges (both source and target)
+                this.architectureData.edges = this.architectureData.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+
+                // Remove from hierarchy (if present)
+                if (this.architectureData.hierarchy && this.architectureData.hierarchy[nodeId]) {
+                    delete this.architectureData.hierarchy[nodeId];
+                }
+
+                // Remove from parent lists in hierarchy
+                if (this.architectureData.hierarchy) {
+                    Object.keys(this.architectureData.hierarchy).forEach(parentKey => {
+                        this.architectureData.hierarchy[parentKey] = this.architectureData.hierarchy[parentKey].filter(childId => childId !== nodeId);
+                    });
+                }
+
+                // Remove from Cytoscape
+                this.cy.remove(node);
+
+                // Clear sidebar if selected
+                if (this.state.selectedNode && this.state.selectedNode.id() === nodeId) {
+                    this.clearSelection();
+                }
+            }
+
+            updateNodeData(nodeId, updates) {
+                const nodeData = this.architectureData.nodes.find(n => n.id === nodeId);
+                if (nodeData) {
+                    Object.assign(nodeData.data, updates);
+                }
+            }
+
+            updateSidebar(node) {
+                const sidebar = document.getElementById('component-details');
+
+                if (!node) {
+                    sidebar.innerHTML = `
+                <div class="empty-state">
+                    <h3>Component Explorer</h3>
+                    <p>Hover over a component to see its details, or click to explore its structure.</p>
+                </div>
+            `;
+                    return;
+                }
+
+                const nodeData = node.data();
+                const details = nodeData.details || {};
+                const metadata = this.architectureData.metadata || {};
+                const isTechnical = this.isTechnicalContent(metadata);
+
+                let sidebarHTML = `
+            <h3>${nodeData.label}</h3>
+            
+            <div class="detail-section">
+                <span class="detail-label">Summary:</span>
+                <p class="working-description">${nodeData.summary || nodeData.description || 'No description available.'}</p>
+            </div>
+        `;
+
+                // Add content-specific sections based on content type
+                if (!isTechnical) {
+                    // Non-technical content (like democracy, history, etc.)
+                    sidebarHTML = this.addEducationalSections(sidebarHTML, details, nodeData);
+                } else {
+                    // Technical content (software architecture)
+                    sidebarHTML = this.addTechnicalSections(sidebarHTML, details);
+                }
+
+                sidebar.innerHTML = sidebarHTML;
+            }
+
+            isTechnicalContent(metadata) {
+                const technicalTypes = ['software', 'code', 'architecture', 'system', 'api', 'framework'];
+                const nonTechnicalTypes = ['educational', 'political-science', 'history', 'social', 'concept'];
+
+                if (metadata.contentType && nonTechnicalTypes.includes(metadata.contentType)) {
+                    return false;
+                }
+
+                if (metadata.topic && nonTechnicalTypes.includes(metadata.topic)) {
+                    return false;
+                }
+
+                if (metadata.contentType && technicalTypes.includes(metadata.contentType)) {
+                    return true;
+                }
+
+                // Default to technical for backward compatibility
+                return true;
+            }
+
+            addEducationalSections(sidebarHTML, details, nodeData) {
+                // Add educational content sections with comprehensive details
+
+                // Key Principles
+                if (nodeData.keyPrinciples && nodeData.keyPrinciples.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Principles:</span>
+                    <ul class="principles-list">
+                        ${nodeData.keyPrinciples.map(principle => `<li>${principle}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Key Functions
+                if (nodeData.keyFunctions && nodeData.keyFunctions.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Functions:</span>
+                    <ul class="functions-list">
+                        ${nodeData.keyFunctions.map(func => `<li>${func}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Key Responsibilities
+                if (nodeData.keyResponsibilities && nodeData.keyResponsibilities.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Responsibilities:</span>
+                    <ul class="responsibilities-list">
+                        ${nodeData.keyResponsibilities.map(resp => `<li>${resp}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Key Features
+                if (nodeData.keyFeatures && nodeData.keyFeatures.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Features:</span>
+                    <ul class="features-list">
+                        ${nodeData.keyFeatures.map(feature => `<li>${feature}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Powers
+                if (nodeData.powers && nodeData.powers.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Powers:</span>
+                    <ul class="powers-list">
+                        ${nodeData.powers.map(power => `<li>${power}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Key Powers
+                if (nodeData.keyPowers && nodeData.keyPowers.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Powers:</span>
+                    <ul class="key-powers-list">
+                        ${nodeData.keyPowers.map(power => `<li>${power}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Selection Method
+                if (nodeData.selectionMethod) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Selection Method:</span>
+                    <p class="selection-description">${nodeData.selectionMethod}</p>
+                </div>`;
+                }
+
+                // Accountability
+                if (nodeData.accountability) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Accountability:</span>
+                    <p class="accountability-description">${nodeData.accountability}</p>
+                </div>`;
+                }
+
+                // Term Length
+                if (nodeData.termLength) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Term Length:</span>
+                    <p class="term-description">${nodeData.termLength}</p>
+                </div>`;
+                }
+
+                // Composition
+                if (nodeData.composition) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Composition:</span>
+                    <p class="composition-description">${nodeData.composition}</p>
+                </div>`;
+                }
+
+                // Principle
+                if (nodeData.principle) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Core Principle:</span>
+                    <p class="principle-description">${nodeData.principle}</p>
+                </div>`;
+                }
+
+                // Structure
+                if (nodeData.structure) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Structure:</span>
+                    <p class="structure-description">${nodeData.structure}</p>
+                </div>`;
+                }
+
+                // Sovereignty
+                if (nodeData.sovereignty) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Sovereignty:</span>
+                    <p class="sovereignty-description">${nodeData.sovereignty}</p>
+                </div>`;
+                }
+
+                // Representation
+                if (nodeData.representation) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Representation:</span>
+                    <p class="representation-description">${nodeData.representation}</p>
+                </div>`;
+                }
+
+                // Special Powers
+                if (nodeData.specialPowers) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Special Powers:</span>
+                    <p class="special-powers-description">${nodeData.specialPowers}</p>
+                </div>`;
+                }
+
+                // Jurisdiction
+                if (nodeData.jurisdiction) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Jurisdiction:</span>
+                    <p class="jurisdiction-description">${nodeData.jurisdiction}</p>
+                </div>`;
+                }
+
+                // Independence
+                if (nodeData.independence) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Independence:</span>
+                    <p class="independence-description">${nodeData.independence}</p>
+                </div>`;
+                }
+
+                // Requirements
+                if (nodeData.requirements) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Requirements:</span>
+                    <p class="requirements-description">${nodeData.requirements}</p>
+                </div>`;
+                }
+
+                // Significance
+                if (nodeData.significance) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Significance:</span>
+                    <p class="significance-description">${nodeData.significance}</p>
+                </div>`;
+                }
+
+                // Democratic Role
+                if (nodeData.democraticRole) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Democratic Role:</span>
+                    <p class="democratic-role-description">${nodeData.democraticRole}</p>
+                </div>`;
+                }
+
+                // Key Components
+                if (nodeData.keyComponents && nodeData.keyComponents.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Key Components:</span>
+                    <ul class="components-list">
+                        ${nodeData.keyComponents.map(component => `<li>${component}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Historical Context
+                if (nodeData.historicalContext) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Historical Context:</span>
+                    <p class="context-description">${nodeData.historicalContext}</p>
+                </div>`;
+                }
+
+                // Advantages
+                if (nodeData.advantages && nodeData.advantages.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Advantages:</span>
+                    <ul class="advantages-list">
+                        ${nodeData.advantages.map(advantage => `<li>${advantage}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Mechanisms
+                if (nodeData.mechanisms && nodeData.mechanisms.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Mechanisms:</span>
+                    <ul class="mechanisms-list">
+                        ${nodeData.mechanisms.map(mechanism => `<li>${mechanism}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Types
+                if (nodeData.types && nodeData.types.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Types:</span>
+                    <ul class="types-list">
+                        ${nodeData.types.map(type => `<li>${type}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Characteristics
+                if (nodeData.characteristics && nodeData.characteristics.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Characteristics:</span>
+                    <ul class="characteristics-list">
+                        ${nodeData.characteristics.map(char => `<li>${char}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Effects
+                if (nodeData.effects) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Effects:</span>
+                    <p class="effects-description">${nodeData.effects}</p>
+                </div>`;
+                }
+
+                // Purpose
+                if (nodeData.purpose) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Purpose:</span>
+                    <p class="purpose-description">${nodeData.purpose}</p>
+                </div>`;
+                }
+
+                // Implementation
+                if (nodeData.implementation) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Implementation:</span>
+                    <p class="implementation-description">${nodeData.implementation}</p>
+                </div>`;
+                }
+
+                // Importance
+                if (nodeData.importance) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Importance:</span>
+                    <p class="importance-description">${nodeData.importance}</p>
+                </div>`;
+                }
+
+                // Challenges
+                if (nodeData.challenges) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Challenges:</span>
+                    <p class="challenges-description">${nodeData.challenges}</p>
+                </div>`;
+                }
+
+                // Benefits
+                if (nodeData.benefits) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Benefits:</span>
+                    <p class="benefits-description">${nodeData.benefits}</p>
+                </div>`;
+                }
+
+                // Concerns
+                if (nodeData.concerns) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Concerns:</span>
+                    <p class="concerns-description">${nodeData.concerns}</p>
+                </div>`;
+                }
+
+                // Rich Food Sources (for vitamins) - supports both richestFoods and richFoods fields
+                if (nodeData.richestFoods && nodeData.richestFoods.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Rich Food Sources:</span>
+                    <ul class="rich-foods-list">
+                        ${nodeData.richestFoods.map(food => `<li>${food}</li>`).join('')}
+                    </ul>
+                </div>`;
+                } else if (nodeData.richFoods && nodeData.richFoods.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Rich Food Sources:</span>
+                    <ul class="rich-foods-list">
+                        ${nodeData.richFoods.map(food => `<li>${food}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Deficiency Symptoms (for vitamins) - supports both deficiencySymptoms and deficiency fields
+                if (nodeData.deficiencySymptoms && nodeData.deficiencySymptoms.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Deficiency Symptoms:</span>
+                    <ul class="deficiency-symptoms-list">
+                        ${nodeData.deficiencySymptoms.map(symptom => `<li>${symptom}</li>`).join('')}
+                    </ul>
+                </div>`;
+                } else if (nodeData.deficiency && nodeData.deficiency.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Deficiency Symptoms:</span>
+                    <ul class="deficiency-symptoms-list">
+                        ${nodeData.deficiency.map(symptom => `<li>${symptom}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                // Daily Requirement (for vitamins)
+                if (nodeData.dailyRequirement) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Daily Requirement:</span>
+                    <p class="daily-requirement-description">${nodeData.dailyRequirement}</p>
+                </div>`;
+                }
+
+                // Special Considerations (for vitamins)
+                if (nodeData.specialConsiderations) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Special Considerations:</span>
+                    <p class="special-considerations-description">${nodeData.specialConsiderations}</p>
+                </div>`;
+                }
+
+                return sidebarHTML;
+            }
+
+            addTechnicalSections(sidebarHTML, details) {
+                // Technical content sections (original implementation)
+                if ((details.inputs && details.inputs.length > 0) || (details.outputs && details.outputs.length > 0)) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Data Flow:</span>
+                    <div class="io-summary">`;
+
+                    if (details.inputs && details.inputs.length > 0) {
+                        sidebarHTML += `<div class="io-quick">📥 <strong>Inputs:</strong> `;
+                        sidebarHTML += details.inputs.map(input => `${input.name} (${input.format})`).join(', ');
+                        sidebarHTML += `</div>`;
+                    }
+
+                    if (details.outputs && details.outputs.length > 0) {
+                        sidebarHTML += `<div class="io-quick">📤 <strong>Outputs:</strong> `;
+                        sidebarHTML += details.outputs.map(output => `${output.name} (${output.format})`).join(', ');
+                        sidebarHTML += `</div>`;
+                    }
+
+                    sidebarHTML += `</div></div>`;
+                }
+
+                if (details.signature) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Signature:</span>
+                    <div class="signature">${details.signature}</div>
+                </div>`;
+                }
+
+                if (details.working) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">How it works:</span>
+                    <p class="working-description">${details.working}</p>
+                </div>`;
+                }
+
+                if (details.imports && details.imports.length > 0) {
+                    sidebarHTML += `
+                <div class="detail-section">
+                    <span class="detail-label">Dependencies:</span>
+                    <ul class="imports-list">
+                        ${details.imports.map(imp => `<li>${imp}</li>`).join('')}
+                    </ul>
+                </div>`;
+                }
+
+                return sidebarHTML;
+            }
+
+            updateProjectHeader() {
+                const header = document.getElementById('project-info');
+                const metadata = this.architectureData.metadata || {};
+
+                header.innerHTML = `
+            <div class="project-header">
+                <h1 class="project-title">${metadata.projectName || 'Architecture Documentation'}</h1>
+                <p class="project-description">${metadata.description || 'Interactive component visualization'}</p>
+            </div>
+        `;
+            }
+
+            // Enhanced tooltip system for better user interaction
+            showNodeTooltip(node, event) {
+                const tooltip = this.getOrCreateTooltip();
+                const nodeData = node.data();
+
+                let content = `<div class="tooltip-header">${nodeData.label}</div>`;
+                if (nodeData.type) content += `<div class="tooltip-type">Type: ${nodeData.type}</div>`;
+                if (nodeData.description) content += `<div class="tooltip-desc">${nodeData.description}</div>`;
+
+                const connections = node.connectedEdges().length;
+                content += `<div class="tooltip-connections">Connections: ${connections}</div>`;
+
+                tooltip.innerHTML = content;
+                tooltip.style.display = 'block';
+                this.positionTooltip(tooltip, event);
+            }
+
+            showEdgeTooltip(edge, event) {
+                const tooltip = this.getOrCreateTooltip();
+                const edgeData = edge.data();
+                const sourceLabel = edge.source().data('label');
+                const targetLabel = edge.target().data('label');
+
+                let content = `<div class="tooltip-header">${sourceLabel} → ${targetLabel}</div>`;
+                if (edgeData.type) content += `<div class="tooltip-type">Relationship: ${edgeData.type}</div>`;
+                if (edgeData.description) content += `<div class="tooltip-desc">${edgeData.description}</div>`;
+
+                tooltip.innerHTML = content;
+                tooltip.style.display = 'block';
+                this.positionTooltip(tooltip, event);
+            }
+
+            hideTooltips() {
+                const tooltip = document.getElementById('cytoscape-tooltip');
+                if (tooltip) tooltip.style.display = 'none';
+            }
+
+            positionTooltip(tooltip, event) {
+                const containerRect = this.cy.container().getBoundingClientRect();
+                const x = event.renderedPosition.x + containerRect.left + 10;
+                const y = event.renderedPosition.y + containerRect.top - 10;
+
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = y + 'px';
+
+                // Ensure tooltip stays within viewport
+                const tooltipRect = tooltip.getBoundingClientRect();
+                if (tooltipRect.right > window.innerWidth) {
+                    tooltip.style.left = (x - tooltipRect.width - 20) + 'px';
+                }
+                if (tooltipRect.top < 0) {
+                    tooltip.style.top = (y + 40) + 'px';
+                }
+            }
+
+            getOrCreateTooltip() {
+                let tooltip = document.getElementById('cytoscape-tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.id = 'cytoscape-tooltip';
+                    tooltip.style.cssText = `
+                position: fixed;
+                background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(30,30,30,0.95));
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+                z-index: 10000;
+                max-width: 280px;
+                pointer-events: none;
+                display: none;
+                backdrop-filter: blur(10px);
+                line-height: 1.4;
+            `;
+
+                    // Add tooltip styles
+                    const style = document.createElement('style');
+                    style.textContent = `
+                #cytoscape-tooltip .tooltip-header {
+                    font-weight: 600;
+                    color: #ffffff;
+                    margin-bottom: 6px;
+                    font-size: 14px;
+                }
+                #cytoscape-tooltip .tooltip-type {
+                    color: #64B5F6;
+                    font-size: 12px;
+                    margin-bottom: 4px;
+                }
+                #cytoscape-tooltip .tooltip-desc {
+                    color: #E0E0E0;
+                    font-size: 12px;
+                    margin-bottom: 6px;
+                    line-height: 1.3;
+                }
+                #cytoscape-tooltip .tooltip-connections {
+                    color: #81C784;
+                    font-size: 11px;
+                    font-weight: 500;
+                }
+            `;
+                    document.head.appendChild(style);
+                    document.body.appendChild(tooltip);
+                }
+                return tooltip;
+            }
+
+            initialLayout() {
+                // Hide all children initially, show only top-level nodes
+                const topLevelNodes = this.getTopLevelNodes();
+
+                this.cy.nodes().forEach(node => {
+                    const nodeId = node.id();
+                    if (topLevelNodes.includes(nodeId)) {
+                        this.state.visibleNodes.add(nodeId);
+                    } else {
+                        node.addClass('hidden');
+                    }
+                });
+
+                this.applyLayout();
+            }
+
+            getTopLevelNodes() {
+                const allNodes = this.architectureData.nodes.map(n => n.id);
+                const childNodes = new Set();
+
+                // Find all nodes that are children of others
+                Object.values(this.architectureData.hierarchy).forEach(children => {
+                    children.forEach(child => childNodes.add(child));
+                });
+
+                // Top-level nodes are those that are not children of any other node
+                return allNodes.filter(nodeId => !childNodes.has(nodeId));
+            }
+
+            applyLayout() {
+                const visibleElements = this.cy.elements().filter(ele => !ele.hasClass('hidden'));
+
+                const layout = visibleElements.layout({
+                    name: 'dagre',
+                    rankDir: 'TB', // Top to bottom hierarchy
+                    // ANTI-OVERLAP SPACING: Prevent node overlapping
+                    rankSep: 120, // Increased vertical spacing to prevent overlap
+                    nodeSep: 80,  // Increased horizontal spacing between nodes
+                    // Edge separation and routing
+                    edgeSep: 15,  // Space between parallel edges
+                    spacingFactor: 1.3, // Increased overall spacing multiplier
+                    // Algorithm settings for optimal layout
+                    ranker: 'network-simplex', // Best algorithm for hierarchical layouts
+                    align: 'UL', // Align nodes to upper-left for consistent positioning
+                    // Animation and fit settings
+                    marginX: 40, // Good margins to prevent edge clipping
+                    marginY: 40,
+                    animate: true,
+                    animationDuration: 600,
+                    animationEasing: 'ease-in-out',
+                    fit: true,
+                    padding: 40,
+                    // Advanced settings to prevent overlapping
+                    nodeDimensionsIncludeLabels: true, // Account for label size
+                    avoidOverlap: true, // Force non-overlapping layout
+                    idealEdgeLength: 100 // Preferred edge length
+                });
+
+                layout.run();
+            }
+
+            // Control methods
+            expandAll() {
+                // Show all nodes
+                this.cy.nodes().removeClass('hidden');
+
+                // Update visible nodes state
+                this.state.visibleNodes.clear();
+                this.architectureData.nodes.forEach(node => {
+                    this.state.visibleNodes.add(node.id);
+                });
+
+                // Apply layout with a slight delay to ensure nodes are visible
+                setTimeout(() => {
+                    this.applyLayout();
+                }, 100);
+            }
+
+            collapseAll() {
+                this.initialLayout();
+            }
+
+            fitView() {
+                const visibleElements = this.cy.elements().filter(ele => !ele.hasClass('hidden'));
+                this.cy.fit(visibleElements, 50);
+            }
+
+            resetView() {
+                this.state.currentLevel = 0; // Reset drill level
+                this.cy.reset();
+                this.collapseAll();
+            }
+
+            // Level-based drill methods
+            calculateMaxLevel() {
+                const getNodeLevel = (nodeId, level = 0) => {
+                    const children = this.architectureData.hierarchy[nodeId];
+                    if (!children || children.length === 0) {
+                        return level;
+                    }
+
+                    let maxChildLevel = level;
+                    children.forEach(childId => {
+                        const childLevel = getNodeLevel(childId, level + 1);
+                        maxChildLevel = Math.max(maxChildLevel, childLevel);
+                    });
+
+                    return maxChildLevel;
+                };
+
+                // Start from top-level nodes
+                const topLevelNodes = this.getTopLevelNodes();
+                let maxLevel = 0;
+
+                topLevelNodes.forEach(nodeId => {
+                    const nodeLevel = getNodeLevel(nodeId, 0);
+                    maxLevel = Math.max(maxLevel, nodeLevel);
+                });
+
+                this.state.maxLevel = maxLevel;
+                return maxLevel;
+            }
+
+            drillDown() {
+                if (this.state.currentLevel >= this.state.maxLevel) {
+                    return;
+                }
+
+                this.state.currentLevel++;
+                this.showNodesUpToLevel(this.state.currentLevel);
+            }
+
+            drillUp() {
+                if (this.state.currentLevel <= 0) {
+                    return;
+                }
+
+                this.state.currentLevel--;
+                this.showNodesUpToLevel(this.state.currentLevel);
+            }
+
+            showNodesUpToLevel(targetLevel) {
+                // First hide all nodes
+                this.cy.nodes().addClass('hidden');
+                this.state.visibleNodes.clear();
+
+                const showNodeAndAncestors = (nodeId, currentLevel = 0) => {
+                    if (currentLevel <= targetLevel) {
+                        // Show this node
+                        const node = this.cy.getElementById(nodeId);
+                        if (node.length > 0) {
+                            node.removeClass('hidden');
+                            this.state.visibleNodes.add(nodeId);
+                        }
+
+                        // Show children if we haven't reached target level
+                        if (currentLevel < targetLevel) {
+                            const children = this.architectureData.hierarchy[nodeId];
+                            if (children) {
+                                children.forEach(childId => {
+                                    showNodeAndAncestors(childId, currentLevel + 1);
+                                });
+                            }
+                        }
+                    }
+                };
+
+                // Start from top-level nodes
+                const topLevelNodes = this.getTopLevelNodes();
+                topLevelNodes.forEach(nodeId => {
+                    showNodeAndAncestors(nodeId, 0);
+                });
+
+                // Apply layout to visible nodes
+                this.applyLayout();
+            }
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // Architecture data will be injected here by the generator
+            // Architecture data will be injected here by the generator
+            const architectureData = "Insert json here"
+
+
+            // Create the viewer
+            window.architectureViewer = new ArchitectureViewer('cy', architectureData);
+
+            // Setup control buttons with error handling
+            const expandBtn = document.getElementById('expand-all');
+            if (expandBtn) {
+                expandBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.expandAll();
+                });
+            }
+
+            const collapseBtn = document.getElementById('collapse-all');
+            if (collapseBtn) {
+                collapseBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.collapseAll();
+                });
+            }
+
+            const fitBtn = document.getElementById('fit-view');
+            if (fitBtn) {
+                fitBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.fitView();
+                });
+            }
+
+            const resetBtn = document.getElementById('reset-view');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.resetView();
+                });
+            }
+
+            // Drill down/up buttons
+            const drillDownBtn = document.getElementById('drill-down');
+            if (drillDownBtn) {
+                drillDownBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.drillDown();
+                });
+            }
+
+            const drillUpBtn = document.getElementById('drill-up');
+            if (drillUpBtn) {
+                drillUpBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.architectureViewer.drillUp();
+                });
+            }
+
+            // Documentation toggle button
+            const toggleDocsBtn = document.getElementById('toggle-docs');
+            if (toggleDocsBtn) {
+                toggleDocsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // Navigate to documentation page
+                    const currentPage = window.location.pathname;
+                    const docPage = currentPage.replace('.html', '-documentation.html');
+                    window.location.href = docPage;
+                });
+            }
+        });
+
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const themeIcon = document.querySelector('.theme-icon');
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            html.setAttribute('data-theme', newTheme);
+            themeIcon.textContent = newTheme === 'light' ? '🌙' : '☀️';
+
+            // Save preference to localStorage
+            localStorage.setItem('preferred-theme', newTheme);
+        }
+
+        // Load saved theme on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            const savedTheme = localStorage.getItem('preferred-theme') || 'dark';
+            const html = document.documentElement;
+            const themeIcon = document.querySelector('.theme-icon');
+
+            html.setAttribute('data-theme', savedTheme);
+            themeIcon.textContent = savedTheme === 'light' ? '🌙' : '☀️';
+        });
+    </script>
+</body>
+
+</html>
