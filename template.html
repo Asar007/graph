@@ -2573,99 +2573,117 @@
             }
 
             applyMindmapLayout(visibleElements) {
-                // Smart Radial Layout implementation
+                // Smart Recursive Radial Layout
                 const rootIds = this.getTopLevelNodes();
                 if (rootIds.length === 0) return;
 
                 const rootId = rootIds[0];
-                const rootNode = this.cy.getElementById(rootId);
 
-                // Radius Configuration
-                const R1 = 300; // Increased radius for L1
-                const R2 = 220; // Radius for L2
+                // Helper to get connected children (visible in Cytoscape)
+                const getVisibleChildren = (nodeId) => {
+                    // Check hierarchy first
+                    const initialChildrenIds = this.architectureData.hierarchy && this.architectureData.hierarchy[nodeId]
+                        ? this.architectureData.hierarchy[nodeId]
+                        : [];
+
+                    // Filter for nodes that actually exist in the graph and are visible
+                    return initialChildrenIds
+                        .map(id => this.cy.getElementById(id))
+                        .filter(n => n.length > 0 && !n.hasClass('hidden'));
+                };
+
+                // 1. Calculate Subtree Weights (Leaf Counting)
+                // This ensures each leaf gets equal angular space
+                const memoWeights = new Map();
+                const calculateWeight = (nodeId) => {
+                    if (memoWeights.has(nodeId)) return memoWeights.get(nodeId);
+
+                    const children = getVisibleChildren(nodeId);
+                    if (children.length === 0) {
+                        memoWeights.set(nodeId, 1);
+                        return 1;
+                    }
+
+                    let sum = 0;
+                    children.forEach(child => {
+                        sum += calculateWeight(child.id());
+                    });
+
+                    // Ensure branches with children have at least enough weight to accommodate them
+                    const weight = Math.max(1, sum);
+                    memoWeights.set(nodeId, weight);
+                    return weight;
+                };
+
+                // Start calculation from root
+                calculateWeight(rootId);
+
+                // 2. Recursive Positioning
+                const baseRadius = 250; // Distance between levels
+                let maxCalculatedDepth = 0;
+
+                const positionNode = (nodeId, startAngle, endAngle, level) => {
+                    const node = this.cy.getElementById(nodeId);
+                    if (node.length === 0) return;
+
+                    maxCalculatedDepth = Math.max(maxCalculatedDepth, level);
+
+                    // Store level for styling
+                    node.data('level', level);
+
+                    if (level === 0) {
+                        node.position({ x: 0, y: 0 });
+                    } else {
+                        // Position in the middle of the assigned sector
+                        const midAngle = (startAngle + endAngle) / 2;
+                        const radius = level * baseRadius;
+
+                        const x = radius * Math.cos(midAngle);
+                        const y = radius * Math.sin(midAngle);
+                        node.position({ x, y });
+                    }
+
+                    // Process Visible Children
+                    const children = getVisibleChildren(nodeId);
+                    if (children.length === 0) return;
+
+                    let currentStart = startAngle;
+                    const totalChildWeight = children.reduce((acc, child) => acc + (memoWeights.get(child.id()) || 1), 0);
+                    const sectorSize = endAngle - startAngle;
+
+                    children.forEach(child => {
+                        const childWeight = memoWeights.get(child.id()) || 1;
+                        // Proportional share of the sector
+                        const childSector = (childWeight / totalChildWeight) * sectorSize;
+
+                        positionNode(child.id(), currentStart, currentStart + childSector, level + 1);
+
+                        currentStart += childSector;
+                    });
+                };
 
                 this.cy.batch(() => {
-                    // 1. Position Root
-                    rootNode.position({ x: 0, y: 0 });
-
-                    // 2. Get L1 Nodes and Calculate Subtree Weights
-                    const L1_ids = this.architectureData.hierarchy[rootId] || [];
-                    const L1_nodes = L1_ids.map(id => this.cy.getElementById(id)).filter(n => n.nonempty() && !n.hasClass('hidden'));
-
-                    if (L1_nodes.length === 0) return;
-
-                    // Calculate weights (number of L2 children + 1 for self)
-                    const nodeWeights = L1_nodes.map(node => {
-                        const children = this.architectureData.hierarchy[node.id()] || [];
-                        const visibleChildren = children.map(id => this.cy.getElementById(id)).filter(n => n.nonempty() && !n.hasClass('hidden'));
-                        return {
-                            node: node,
-                            weight: Math.max(1, visibleChildren.length), // Weight is basically number of leaves/children
-                            children: visibleChildren
-                        };
-                    });
-
-                    const totalWeight = nodeWeights.reduce((sum, item) => sum + item.weight, 0);
-                    let currentAngle = 0;
-
-                    // 3. Position L1 and L2 Nodes
-                    nodeWeights.forEach(item => {
-                        const node = item.node;
-                        const weight = item.weight;
-
-                        // Sector size proportional to weight
-                        const sectorSize = (weight / totalWeight) * 2 * Math.PI;
-
-                        // Center angle of this sector
-                        const angle = currentAngle + (sectorSize / 2);
-
-                        // Position L1 Node
-                        const x = R1 * Math.cos(angle);
-                        const y = R1 * Math.sin(angle);
-                        node.position({ x, y });
-
-                        // Position L2 Children (Fan out within the sector)
-                        const children = item.children;
-                        if (children.length > 0) {
-                            // We occupy 80% of the sector for children to leave gaps between groups
-                            const spreadAngle = sectorSize * 0.8;
-                            const startChildAngle = angle - (spreadAngle / 2);
-                            const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
-
-                            children.forEach((child, j) => {
-                                // If only 1 child, put it at the center angle
-                                const childAngle = children.length === 1 ? angle : startChildAngle + (j * angleStep);
-
-                                const cx = x + R2 * Math.cos(childAngle);
-                                const cy = y + R2 * Math.sin(childAngle);
-                                child.position({ x: cx, y: cy });
-                            });
-                        }
-
-                        // Advance the angle tracker
-                        currentAngle += sectorSize;
-                    });
+                    // Full circle for root
+                    positionNode(rootId, 0, 2 * Math.PI, 0);
                 });
 
-                // === STYLING UPDATE ===
-                this.updateStyles(rootId);
+                // 3. Update Styles based on new levels
+                this.updateStyles();
 
-                // Delay fit to ensure rendering is done
+                // Delay fit to ensure rendering is complete
                 setTimeout(() => {
                     this.cy.fit(visibleElements, 50);
                     this.cy.forceRender();
                 }, 200);
             }
 
-            updateStyles(rootId) {
-                const L1_ids_list = this.architectureData.hierarchy[rootId] || [];
-                const L1_selector = L1_ids_list.length > 0 ? L1_ids_list.map(id => '#' + id).join(',') : '.dummy';
-
+            updateStyles() {
                 this.cy.style()
+                    // Base Node Style
                     .selector('node')
                     .style({
                         'shape': 'ellipse',
-                        'background-color': '#FFF59D',
+                        'background-color': '#FFF59D', // Default (Leaf/Deepest)
                         'border-color': '#FBC02D',
                         'border-width': 2,
                         'color': '#333',
@@ -2677,28 +2695,49 @@
                         'text-halign': 'center',
                         'font-size': '12px'
                     })
-                    .selector(L1_selector)
+                    // Level 0: Root
+                    .selector('node[level = 0]')
                     .style({
-                        'background-color': '#A5D6A7',
-                        'border-color': '#388E3C',
-                        'font-size': '14px',
-                        'font-weight': 'bold',
-                        'padding': '20px'
-                    })
-                    .selector('#' + rootId)
-                    .style({
-                        'background-color': '#90CAF9',
+                        'background-color': '#90CAF9', // Blue
                         'border-color': '#1976D2',
+                        'font-size': '24px',
+                        'font-weight': 'bold',
+                        'padding': '40px',
+                        'border-width': 4
+                    })
+                    // Level 1: Categories
+                    .selector('node[level = 1]')
+                    .style({
+                        'background-color': '#A5D6A7', // Green
+                        'border-color': '#388E3C',
                         'font-size': '18px',
                         'font-weight': 'bold',
-                        'padding': '30px'
+                        'padding': '25px',
+                        'border-width': 3
                     })
+                    // Level 2: Sub-categories
+                    .selector('node[level = 2]')
+                    .style({
+                        'background-color': '#FFCC80', // Orange
+                        'border-color': '#F57C00',
+                        'font-size': '14px',
+                        'padding': '20px',
+                        'border-width': 2
+                    })
+                    // Level 3+: Leaves
+                    .selector('node[level >= 3]')
+                    .style({
+                        'background-color': '#E1BEE7', // Purple
+                        'border-color': '#8E24AA',
+                        'font-size': '12px'
+                    })
+                    // Connecting Edges
                     .selector('edge')
                     .style({
                         'width': 2,
                         'line-color': '#B0BEC5',
                         'opacity': 0.6,
-                        'curve-style': 'straight',
+                        'curve-style': 'bezier',
                         'target-arrow-shape': 'none'
                     })
                     .update();
