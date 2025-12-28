@@ -841,6 +841,7 @@
                 <button id="fit-view" class="btn btn-secondary">🎯 Fit View</button>
                 <button id="add-node" class="btn btn-secondary">➕ Add Node</button>
                 <button id="toggle-docs" class="btn btn-docs">📚 Full Documentation</button>
+                <button id="download-btn" class="btn btn-secondary">💾 Download</button>
             </div>
 
             <!-- Cytoscape Container -->
@@ -964,90 +965,67 @@
             }
 
             processArchitectureData() {
-                const nodes = this.architectureData.nodes.map(node => ({
-                    group: 'nodes',
-                    data: {
-                        id: node.id,
-                        label: node.data.label,
-                        type: node.data.type || 'default',
-                        // Include ALL node data for detailed summaries
-                        description: node.data.description,
-                        summary: node.data.summary,
-                        keyPrinciples: node.data.keyPrinciples,
-                        keyFunctions: node.data.keyFunctions,
-                        keyResponsibilities: node.data.keyResponsibilities,
-                        keyFeatures: node.data.keyFeatures,
-                        keyPowers: node.data.keyPowers,
-                        powers: node.data.powers,
-                        functions: node.data.functions,
-                        historicalContext: node.data.historicalContext,
-                        selectionMethod: node.data.selectionMethod,
-                        accountability: node.data.accountability,
-                        termLength: node.data.termLength,
-                        composition: node.data.composition,
-                        principle: node.data.principle,
-                        structure: node.data.structure,
-                        sovereignty: node.data.sovereignty,
-                        representation: node.data.representation,
-                        specialPowers: node.data.specialPowers,
-                        jurisdiction: node.data.jurisdiction,
-                        independence: node.data.independence,
-                        specialization: node.data.specialization,
-                        requirements: node.data.requirements,
-                        significance: node.data.significance,
-                        democraticRole: node.data.democraticRole,
-                        keyComponents: node.data.keyComponents,
-                        keyElements: node.data.keyElements,
-                        protectedRights: node.data.protectedRights,
-                        purpose: node.data.purpose,
-                        enforcement: node.data.enforcement,
-                        types: node.data.types,
-                        considerations: node.data.considerations,
-                        impact: node.data.impact,
-                        advantages: node.data.advantages,
-                        mechanisms: node.data.mechanisms,
-                        variants: node.data.variants,
-                        characteristics: node.data.characteristics,
-                        effects: node.data.effects,
-                        mechanics: node.data.mechanics,
-                        controversies: node.data.controversies,
-                        process: node.data.process,
-                        benefits: node.data.benefits,
-                        concerns: node.data.concerns,
-                        methods: node.data.methods,
-                        regulation: node.data.regulation,
-                        balance: node.data.balance,
-                        implementation: node.data.implementation,
-                        importance: node.data.importance,
-                        challenges: node.data.challenges,
-                        protection: node.data.protection,
-                        branches: node.data.branches,
-                        mechanism: node.data.mechanism,
-                        examples: node.data.examples,
-                        operation: node.data.operation,
-                        effect: node.data.effect,
-                        // Vitamin-specific fields
-                        richestFoods: node.data.richestFoods,
-                        richFoods: node.data.richFoods,
-                        deficiencySymptoms: node.data.deficiencySymptoms,
-                        deficiency: node.data.deficiency,
-                        dailyRequirement: node.data.dailyRequirement,
-                        specialConsiderations: node.data.specialConsiderations,
-                        details: this.architectureData.details[node.id] || {}
-                    },
-                    classes: node.data.type || 'default'
-                }));
+                const processedNodes = [];
+                const nodeMap = new Map();
 
-                const edges = this.architectureData.edges.map(edge => ({
-                    group: 'edges',
-                    data: {
-                        id: `${edge.source}-${edge.target}`,
-                        source: edge.source,
-                        target: edge.target
-                    }
-                }));
+                // 1. Process explicit nodes
+                if (this.architectureData.nodes) {
+                    this.architectureData.nodes.forEach(node => {
+                        if (!node.id) return;
+                        nodeMap.set(node.id, true);
 
-                return [...nodes, ...edges];
+                        // Merge explicit properties with spread data
+                        const safeDetails = (this.architectureData.details && this.architectureData.details[node.id]) || {};
+
+                        processedNodes.push({
+                            group: 'nodes',
+                            data: {
+                                id: node.id,
+                                ...node.data, // Spread all properties from data object
+                                details: safeDetails
+                            },
+                            classes: (node.data && node.data.type) || 'default'
+                        });
+                    });
+                }
+
+                // 2. Process edges and detect missing nodes
+                const edges = [];
+                if (this.architectureData.edges) {
+                    this.architectureData.edges.forEach(edge => {
+                        if (!edge || !edge.source || !edge.target) return;
+
+                        // Check and auto-create missing nodes
+                        [edge.source, edge.target].forEach(nodeId => {
+                            if (!nodeMap.has(nodeId)) {
+                                console.warn(`Auto-creating missing node from edge: ${nodeId}`);
+                                nodeMap.set(nodeId, true);
+                                processedNodes.push({
+                                    group: 'nodes',
+                                    data: {
+                                        id: nodeId,
+                                        label: nodeId,
+                                        type: 'default',
+                                        description: 'Implicitly created node.',
+                                        summary: 'This node was inferred from connections.'
+                                    },
+                                    classes: 'default'
+                                });
+                            }
+                        });
+
+                        edges.push({
+                            group: 'edges',
+                            data: {
+                                id: `${edge.source}-${edge.target}`,
+                                source: edge.source,
+                                target: edge.target
+                            }
+                        });
+                    });
+                }
+
+                return [...processedNodes, ...edges];
             }
 
             getStylesheet() {
@@ -1376,6 +1354,14 @@
                 if (addNodeBtn) {
                     addNodeBtn.addEventListener('click', () => {
                         this.promptAddNode();
+                    });
+                }
+
+                // Download Button
+                const downloadBtn = document.getElementById('download-btn');
+                if (downloadBtn) {
+                    downloadBtn.addEventListener('click', () => {
+                        this.downloadGraph();
                     });
                 }
             }
@@ -1860,9 +1846,12 @@
                 let sidebarHTML = `
             <h3>${nodeData.label}</h3>
             
-            <div class="detail-section">
-                <span class="detail-label">Summary:</span>
-                <p class="working-description">${nodeData.summary || nodeData.description || 'No description available.'}</p>
+            <div class="detail-section" id="summary-section">
+                 <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="detail-label">Summary:</span>
+                    <button onclick="window.architectureViewer.enableEditMode('summary', '${nodeData.id}')" style="background:none; border:none; cursor:pointer; font-size:12px; color:#64B5F6;">✏️ Edit</button>
+                </div>
+                <p class="working-description" id="summary-text">${nodeData.summary || nodeData.description || 'No description available.'}</p>
             </div>
         `;
 
@@ -2343,6 +2332,51 @@
         `;
             }
 
+            downloadGraph() {
+                // 1. Get current data
+                const currentData = this.architectureData;
+
+                // 2. Get current HTML
+                let htmlContent = document.documentElement.outerHTML;
+
+                // 3. Clean up the View (Cytoscape injects lots of divs)
+                // We reset the container to be empty so it re-initializes cleanly on load
+                htmlContent = htmlContent.replace(/<div id="cy">[\s\S]*?<\/div>/, '<div id="cy"></div>');
+
+                // 4. Update the data
+                // We look for the variable declaration pattern
+                const jsonStr = JSON.stringify(currentData, null, 2);
+
+                // Use a marker-based replacement if possible, or regex
+                // The injection in app.py uses: const architectureData = { ... }; window.architectureViewer
+                // We'll try to match that pattern carefully.
+                // We match 'const architectureData =' followed by anything until 'window.architectureViewer'
+
+                const regex = /(const architectureData =)([\s\S]*?)(window\.architectureViewer = new ArchitectureViewer)/;
+
+                if (regex.test(htmlContent)) {
+                    htmlContent = htmlContent.replace(regex, `$1 ${jsonStr};\n\n            $3`);
+                } else {
+                    // Fallback to simpler regex if the specific markers aren't perfectly aligned
+                    // assuming architectureData is defined before viewer
+                    console.warn("Could not find exact data pattern, using fallback replacement");
+                    // Let's rely on the markers being present since app.py puts them there.
+                    alert("Error preparing download: Data structure markers not found.");
+                    return;
+                }
+
+                // 5. Create Blob and Download
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'graph_architecture.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
             // Enhanced tooltip system for better user interaction
             showNodeTooltip(node, event) {
                 const tooltip = this.getOrCreateTooltip();
@@ -2453,6 +2487,14 @@
             }
 
             initialLayout() {
+                const metadata = this.architectureData.metadata || {};
+
+                // For Mindmaps, expand everything by default to show the full map
+                if (metadata.contentType === 'mindmap') {
+                    this.expandAll();
+                    return;
+                }
+
                 // Hide all children initially, show only top-level nodes
                 const topLevelNodes = this.getTopLevelNodes();
 
@@ -2469,48 +2511,232 @@
             }
 
             getTopLevelNodes() {
-                const allNodes = this.architectureData.nodes.map(n => n.id);
+                if (!this.architectureData.nodes) return [];
+                const allNodes = this.architectureData.nodes.filter(n => n && n.id).map(n => n.id);
                 const childNodes = new Set();
 
                 // Find all nodes that are children of others
-                Object.values(this.architectureData.hierarchy).forEach(children => {
-                    children.forEach(child => childNodes.add(child));
-                });
+                if (this.architectureData.hierarchy) {
+                    Object.values(this.architectureData.hierarchy).forEach(children => {
+                        if (Array.isArray(children)) {
+                            children.forEach(child => childNodes.add(child));
+                        }
+                    });
+                }
 
                 // Top-level nodes are those that are not children of any other node
                 return allNodes.filter(nodeId => !childNodes.has(nodeId));
             }
 
             applyLayout() {
-                const visibleElements = this.cy.elements().filter(ele => !ele.hasClass('hidden'));
+                // Only include visible nodes and edges connected to visible nodes
+                const visibleNodes = this.cy.nodes().filter(ele => !ele.hasClass('hidden'));
+                const visibleEdges = visibleNodes.connectedEdges().filter(edge => !edge.source().hasClass('hidden') && !edge.target().hasClass('hidden'));
+                const visibleElements = visibleNodes.union(visibleEdges);
 
-                const layout = visibleElements.layout({
-                    name: 'dagre',
-                    rankDir: 'TB', // Top to bottom hierarchy
-                    // ANTI-OVERLAP SPACING: Prevent node overlapping
-                    rankSep: 120, // Increased vertical spacing to prevent overlap
-                    nodeSep: 80,  // Increased horizontal spacing between nodes
-                    // Edge separation and routing
-                    edgeSep: 15,  // Space between parallel edges
-                    spacingFactor: 1.3, // Increased overall spacing multiplier
-                    // Algorithm settings for optimal layout
-                    ranker: 'network-simplex', // Best algorithm for hierarchical layouts
-                    align: 'UL', // Align nodes to upper-left for consistent positioning
-                    // Animation and fit settings
-                    marginX: 40, // Good margins to prevent edge clipping
-                    marginY: 40,
-                    animate: true,
-                    animationDuration: 600,
-                    animationEasing: 'ease-in-out',
-                    fit: true,
-                    padding: 40,
-                    // Advanced settings to prevent overlapping
-                    nodeDimensionsIncludeLabels: true, // Account for label size
-                    avoidOverlap: true, // Force non-overlapping layout
-                    idealEdgeLength: 100 // Preferred edge length
+                console.log(`Applying Layout to ${visibleElements.length} elements (${visibleElements.nodes().length} nodes, ${visibleElements.edges().length} edges)`);
+                const metadata = this.architectureData.metadata || {};
+                const isMindmap = metadata.contentType === 'mindmap';
+
+                if (isMindmap) {
+                    this.applyMindmapLayout(visibleElements);
+                } else {
+                    // Standard Hierarchy Layout
+                    const layoutOptions = {
+                        name: 'dagre',
+                        rankDir: 'TB', // Top to bottom hierarchy
+                        rankSep: 120,
+                        nodeSep: 80,
+                        edgeSep: 15,
+                        spacingFactor: 1.3,
+                        ranker: 'network-simplex',
+                        align: 'UL',
+                        marginX: 40,
+                        marginY: 40,
+                        animate: true,
+                        animationDuration: 600,
+                        animationEasing: 'ease-in-out',
+                        fit: true,
+                        padding: 40,
+                        nodeDimensionsIncludeLabels: true,
+                        avoidOverlap: true,
+                        idealEdgeLength: 100
+                    };
+
+                    try {
+                        const layout = visibleElements.layout(layoutOptions);
+                        layout.run();
+                    } catch (e) {
+                        console.error("Layout Error:", e);
+                    }
+                }
+            }
+
+            applyMindmapLayout(visibleElements) {
+                // Smart Radial Layout implementation
+                const rootIds = this.getTopLevelNodes();
+                if (rootIds.length === 0) return;
+
+                const rootId = rootIds[0];
+                const rootNode = this.cy.getElementById(rootId);
+
+                // Radius Configuration
+                const R1 = 300; // Increased radius for L1
+                const R2 = 220; // Radius for L2
+
+                this.cy.batch(() => {
+                    // 1. Position Root
+                    rootNode.position({ x: 0, y: 0 });
+
+                    // 2. Get L1 Nodes and Calculate Subtree Weights
+                    const L1_ids = this.architectureData.hierarchy[rootId] || [];
+                    const L1_nodes = L1_ids.map(id => this.cy.getElementById(id)).filter(n => n.nonempty() && !n.hasClass('hidden'));
+
+                    if (L1_nodes.length === 0) return;
+
+                    // Calculate weights (number of L2 children + 1 for self)
+                    const nodeWeights = L1_nodes.map(node => {
+                        const children = this.architectureData.hierarchy[node.id()] || [];
+                        const visibleChildren = children.map(id => this.cy.getElementById(id)).filter(n => n.nonempty() && !n.hasClass('hidden'));
+                        return {
+                            node: node,
+                            weight: Math.max(1, visibleChildren.length), // Weight is basically number of leaves/children
+                            children: visibleChildren
+                        };
+                    });
+
+                    const totalWeight = nodeWeights.reduce((sum, item) => sum + item.weight, 0);
+                    let currentAngle = 0;
+
+                    // 3. Position L1 and L2 Nodes
+                    nodeWeights.forEach(item => {
+                        const node = item.node;
+                        const weight = item.weight;
+
+                        // Sector size proportional to weight
+                        const sectorSize = (weight / totalWeight) * 2 * Math.PI;
+
+                        // Center angle of this sector
+                        const angle = currentAngle + (sectorSize / 2);
+
+                        // Position L1 Node
+                        const x = R1 * Math.cos(angle);
+                        const y = R1 * Math.sin(angle);
+                        node.position({ x, y });
+
+                        // Position L2 Children (Fan out within the sector)
+                        const children = item.children;
+                        if (children.length > 0) {
+                            // We occupy 80% of the sector for children to leave gaps between groups
+                            const spreadAngle = sectorSize * 0.8;
+                            const startChildAngle = angle - (spreadAngle / 2);
+                            const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
+
+                            children.forEach((child, j) => {
+                                // If only 1 child, put it at the center angle
+                                const childAngle = children.length === 1 ? angle : startChildAngle + (j * angleStep);
+
+                                const cx = x + R2 * Math.cos(childAngle);
+                                const cy = y + R2 * Math.sin(childAngle);
+                                child.position({ x: cx, y: cy });
+                            });
+                        }
+
+                        // Advance the angle tracker
+                        currentAngle += sectorSize;
+                    });
                 });
 
-                layout.run();
+                // === STYLING UPDATE ===
+                this.updateStyles(rootId);
+
+                // Delay fit to ensure rendering is done
+                setTimeout(() => {
+                    this.cy.fit(visibleElements, 50);
+                    this.cy.forceRender();
+                }, 200);
+            }
+
+            updateStyles(rootId) {
+                const L1_ids_list = this.architectureData.hierarchy[rootId] || [];
+                const L1_selector = L1_ids_list.length > 0 ? L1_ids_list.map(id => '#' + id).join(',') : '.dummy';
+
+                this.cy.style()
+                    .selector('node')
+                    .style({
+                        'shape': 'ellipse',
+                        'background-color': '#FFF59D',
+                        'border-color': '#FBC02D',
+                        'border-width': 2,
+                        'color': '#333',
+                        'label': 'data(label)',
+                        'width': 'label',
+                        'height': 'label',
+                        'padding': '15px',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': '12px'
+                    })
+                    .selector(L1_selector)
+                    .style({
+                        'background-color': '#A5D6A7',
+                        'border-color': '#388E3C',
+                        'font-size': '14px',
+                        'font-weight': 'bold',
+                        'padding': '20px'
+                    })
+                    .selector('#' + rootId)
+                    .style({
+                        'background-color': '#90CAF9',
+                        'border-color': '#1976D2',
+                        'font-size': '18px',
+                        'font-weight': 'bold',
+                        'padding': '30px'
+                    })
+                    .selector('edge')
+                    .style({
+                        'width': 2,
+                        'line-color': '#B0BEC5',
+                        'opacity': 0.6,
+                        'curve-style': 'straight',
+                        'target-arrow-shape': 'none'
+                    })
+                    .update();
+            }
+
+            enableEditMode(field, nodeId) {
+                const node = this.cy.getElementById(nodeId);
+                const currentValue = node.data(field);
+                const section = document.getElementById(`${field}-section`);
+
+                if (section) {
+                    section.innerHTML = `
+                         <span class="detail-label" style="text-transform:capitalize;">${field}:</span>
+                         <textarea id="edit-${field}" style="width:100%; min-height:80px; background:#333; color:white; border:1px solid #555; border-radius:4px; margin-top:5px; padding:8px;">${currentValue}</textarea>
+                         <div style="display:flex; gap:10px; margin-top:8px;">
+                            <button onclick="window.architectureViewer.saveEdit('${field}', '${nodeId}')" style="background:#4CAF50; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Save</button>
+                            <button onclick="window.architectureViewer.updateSidebar(window.architectureViewer.cy.getElementById('`+ nodeId + `'))" style="background:#F44336; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Cancel</button>
+                         </div>
+                    `;
+                }
+            }
+
+            saveEdit(field, nodeId) {
+                const newValue = document.getElementById(`edit-${field}`).value;
+                const node = this.cy.getElementById(nodeId);
+
+                // Update Cytoscape Data
+                node.data(field, newValue);
+
+                // Update Source Architecture Data (Client-side persistency)
+                // Assuming flat node list or hierarchy lookup. For flat list:
+                const nodeData = this.architectureData.nodes.find(n => n.id === nodeId);
+                if (nodeData) {
+                    nodeData[field] = newValue;
+                }
+
+                // Re-render
+                this.updateSidebar(node);
             }
 
             // Control methods
@@ -2530,8 +2756,27 @@
                 }, 100);
             }
 
+            showRootNodes() {
+                const topLevelNodes = this.getTopLevelNodes();
+
+                // Hide all nodes
+                this.cy.nodes().addClass('hidden');
+                this.state.visibleNodes.clear();
+
+                // Show only top level nodes
+                topLevelNodes.forEach(nodeId => {
+                    const node = this.cy.getElementById(nodeId);
+                    if (node.length > 0) {
+                        node.removeClass('hidden');
+                        this.state.visibleNodes.add(nodeId);
+                    }
+                });
+
+                this.applyLayout();
+            }
+
             collapseAll() {
-                this.initialLayout();
+                this.showRootNodes();
             }
 
             fitView() {
@@ -2635,11 +2880,64 @@
 
             // Architecture data will be injected here by the generator
             // Architecture data will be injected here by the generator
-            const architectureData = "Insert json here"
+            /* [INJECTION_START] */
+            const architectureData = "Insert json here";
+            /* [INJECTION_END] */
+
+            // Expose for debugging
+            window.architectureData = architectureData;
 
 
-            // Create the viewer
-            window.architectureViewer = new ArchitectureViewer('cy', architectureData);
+            // Create the viewer with Error Handling
+            try {
+                if (typeof architectureData === 'string' && architectureData.startsWith("Insert")) {
+                    console.error("Data is placeholder");
+                    throw new Error("Architecture data missing. Please generate a graph first.");
+                }
+
+                if (typeof architectureData === 'undefined') {
+                    throw new Error("architectureData is undefined.");
+                }
+
+                // Check Hierarchy for debug
+                if (architectureData && architectureData.nodes) {
+                    console.log(`Nodes: ${architectureData.nodes.length}, Edges: ${architectureData.edges ? architectureData.edges.length : 0}`);
+                } else {
+                    console.error("Invalid API Data Format");
+                    throw new Error("Invalid architecture data format.");
+                }
+
+                if (architectureData.hierarchy) {
+                    const keys = Object.keys(architectureData.hierarchy);
+                    console.log(`Hierarchy keys: ${keys.length}`);
+                }
+
+                window.architectureViewer = new ArchitectureViewer('cy', architectureData);
+                console.log("Viewer instantiated");
+
+            } catch (e) {
+                console.error("Initialization Error:", e);
+                const container = document.getElementById('cy');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: center; 
+                            justify-content: center; 
+                            height: 100%; 
+                            color: #ef4444; 
+                            text-align: center;
+                            padding: 20px;
+                        ">
+                            <h2 style="margin-bottom: 10px;">⚠️ Graph Rendering Error</h2>
+                            <p style="color: #cbd5e1;">${e.message}</p>
+                            <p style="font-size: 0.8em; color: #94a3b8; margin-top: 20px;">Check browser console for details.</p>
+                             <pre style="text-align:left; background:#333; padding:10px; margin-top:10px; overflow:auto; max-height:200px;">${e.stack}</pre>
+                        </div>
+                    `;
+                }
+            }
 
             // Setup control buttons with error handling
             const expandBtn = document.getElementById('expand-all');
