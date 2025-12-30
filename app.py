@@ -7,7 +7,11 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
+
+# Load environment variables
 load_dotenv(override=True)
+
+# Set page configuration - Must be the first st command
 st.set_page_config(layout="wide", page_title="Ai Graph Generator", initial_sidebar_state="collapsed")
 
 def load_prompt_template():
@@ -41,26 +45,60 @@ def load_mindmap_prompt():
     except FileNotFoundError:
         return None
 
+def load_sequence_prompt():
+    try:
+        with open("sequence_prompt.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+def load_sequence_template():
+    try:
+        with open("sequence_template.html", "r", encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
 def validate_json(json_str):
     try:
+        # Try to clean up markdown code blocks if present
         json_str = re.sub(r'```json\s*', '', json_str)
         json_str = re.sub(r'```\s*$', '', json_str)
         data = json.loads(json_str)
+        
+        # Determine schema validation type
+        if 'participants' in data and 'events' in data:
+            # Sequence Diagram Schema
+            if not isinstance(data.get('participants'), list):
+                 print("Validation Error: 'participants' must be a list")
+                 return None
+            if not isinstance(data.get('events'), list):
+                 print("Validation Error: 'events' must be a list")
+                 return None
+            return data
+
+        # Graph/Mindmap Schema (Fallback)
         required_fields = ['nodes', 'hierarchy', 'edges']
         for field in required_fields:
             if field not in data:
                 print(f"Validation Error: Missing field '{field}'")
                 return None
+                
         if not isinstance(data.get('nodes'), list):
              print("Validation Error: 'nodes' must be a list")
              return None
+
+        # Validate each node has an ID
         for i, node in enumerate(data['nodes']):
             if not isinstance(node, dict) or 'id' not in node:
                 print(f"Validation Error: Node at index {i} missing 'id' or not an object")
-                return None      
+                return None
+                
         if not isinstance(data.get('edges'), list):
              print("Validation Error: 'edges' must be a list")
              return None
+
+        # Validate each edge has source/target
         for i, edge in enumerate(data['edges']):
             if not isinstance(edge, dict) or 'source' not in edge or 'target' not in edge:
                 print(f"Validation Error: Edge at index {i} missing source/target")
@@ -83,8 +121,17 @@ def inject_data_into_html(html_content, json_data):
     end_idx = html_content.find(end_marker)
     
     if start_idx != -1 and end_idx != -1:
+        # Calculate split points
+        # Keep the content before the start marker (and the marker itself for clarity if desired, but let's replace OUT the marker to avoid clutter or keep it?)
+        # Let's keep the markers so we can verify inspection later if needed.
+        
         pre_content = html_content[:start_idx]
         post_content = html_content[end_idx + len(end_marker):]
+        
+        # We need to construct the new block.
+        # Note: We are replacing everything BETWEEN start_idx and end_idx + len(end_marker).
+        # Actually, let's just replace the whole block.
+        
         new_block = f"{start_marker}\n            const architectureData = {json_str};\n            {end_marker}"
         return pre_content + new_block + post_content
     
@@ -97,10 +144,17 @@ def generate_graph(topic, api_key, graph_type="Graph"):
     model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt_template = None
+    html_loader = load_html_template
+
     if graph_type == "Mindmap":
         prompt_template = load_mindmap_prompt()
         if not prompt_template:
             return None, None, "Mindmap prompt template (mindmap_prompt.txt) not found."
+    elif graph_type == "Sequence":
+        prompt_template = load_sequence_prompt()
+        html_loader = load_sequence_template
+        if not prompt_template:
+            return None, None, "Sequence prompt template (sequence_prompt.txt) not found."
     else:
         prompt_template = load_prompt_template()
         
@@ -110,11 +164,12 @@ def generate_graph(topic, api_key, graph_type="Graph"):
             response = model.generate_content(final_prompt)
             json_data = validate_json(response.text)
             if json_data:
-                html_template = load_html_template()
+                html_template = html_loader()
                 if html_template:
                     new_html = inject_data_into_html(html_template, json_data)
                     return new_html, json_data, None
             else:
+                # Include a snippet of the raw text for debugging
                 raw_snippet = response.text[:500].replace('\n', ' ')
                 return None, None, f"Failed to generate valid JSON. Model Output start: {raw_snippet}..."
         except Exception as e:
@@ -127,6 +182,8 @@ def modify_graph(current_json, prompt, api_key):
     template = load_modification_prompt()
     if not template:
         return None, None, "Modification prompt file missing."
+        
+    # Replace placeholders in the text file
     final_prompt = template.replace("[INSERT CURRENT JSON DATA HERE]", json.dumps(current_json))
     final_prompt = final_prompt.replace("[INSERT CHANGE REQUEST HERE]", prompt)
     
@@ -208,7 +265,7 @@ def main():
             st.warning("GOOGLE_API_KEY missing in .env")
             
         # Graph Type Selector
-        graph_type = st.radio("Structure", ["Graph", "Mindmap"], horizontal=True, help="Choose 'Graph' for hierarchical flows or 'Mindmap' for radial brainstorming.")
+        graph_type = st.radio("Structure", ["Graph", "Mindmap", "Sequence"], horizontal=True, help="Choose 'Graph' for hierarchical flows, 'Mindmap' for radial brainstorming, or 'Sequence' for interaction diagrams.")
         
         # Chat Interface
         chat_container = st.container(height=700) 
@@ -269,5 +326,7 @@ def main():
         
         # Download button below graph
         st.download_button("Download HTML", st.session_state.html_content, "graph.html", "text/html")
+
+
 if __name__ == "__main__":
     main()
