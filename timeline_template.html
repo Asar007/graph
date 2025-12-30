@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Viewer</title>
+
+    <!-- Import fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+
+    <style>
+        /* Shared CSS from sequence/template.html */
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #6c757d;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #2c3e50;
+            --text-secondary: #495057;
+            --border-color: #dee2e6;
+            --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --radius-md: 8px;
+            --grid-color: rgba(102, 126, 234, 0.12);
+            --grid-size: 32px;
+        }
+
+        [data-theme='dark'] {
+            --primary-color: #7c93f0;
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --text-primary: #ffffff;
+            --text-secondary: #e2e8f0;
+            --border-color: #4a5568;
+            --grid-color: rgba(124, 147, 240, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family-base);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Sidebar - 20% */
+        .sidebar {
+            width: 20%;
+            height: 100vh;
+            background: var(--bg-secondary);
+            padding: 1rem;
+            overflow-y: auto;
+            border-left: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .detail-item {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.25rem;
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .detail-text {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        /* Graph Area - 80% */
+        .graph-container {
+            width: 80%;
+            height: 100vh;
+            position: relative;
+            background: var(--bg-primary);
+            overflow: hidden;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            /* Grid Background */
+            background-image:
+                linear-gradient(0deg, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+        }
+
+        .graph-container:active {
+            cursor: grabbing;
+        }
+
+        #svg-container {
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mermaid {
+            width: auto;
+            min-width: 600px;
+            text-align: center;
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        .btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            box-shadow: var(--shadow-sm);
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--primary-color);
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Tooltip Styles */
+        .tooltip {
+            position: absolute;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.1s ease-in-out;
+            min-width: 220px;
+            max-width: 400px;
+        }
+
+        .tooltip-header {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .tooltip-type {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .tooltip-desc {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* MERMAID TEXT CONTRAST OVERRIDES */
+        /* Force text colors based on theme, overriding internal styles */
+        [data-theme='dark'] .mermaid svg text,
+        [data-theme='dark'] .mermaid svg g.milestone text,
+        [data-theme='dark'] .mermaid svg g.event text {
+            fill: #ffffff !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme='light'] .mermaid svg text,
+        [data-theme='light'] .mermaid svg g.milestone text,
+        [data-theme='light'] .mermaid svg g.event text {
+            fill: #2c3e50 !important;
+            color: #2c3e50 !important;
+        }
+
+        /* FORCE TIMELINE COLORS TO MATCH THEME (Blue/Grey) */
+        /* Overrides standard mermaid rainbow palette */
+        [id^="mermaid-"] .section {
+            stroke: var(--primary-color) !important;
+            fill: var(--bg-secondary) !important;
+            fill-opacity: 0.5 !important;
+        }
+
+        [id^="mermaid-"] .sectionLine {
+            stroke: var(--primary-color) !important;
+            stroke-width: 2px !important;
+        }
+
+        /* Event lines */
+        [id^="mermaid-"] .cluster-line {
+            stroke: var(--secondary-color) !important;
+        }
+
+        /* RE-INFORCED OVERRIDES FOR RAINBOW REMOVAL */
+        [id^="mermaid-"] .mermaid-main-font {
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        /* Timeline Cycle Colors - Controlled Palette (Blue/Indigo/Purple) */
+        /* Use nth-child on the group to cycle colors for different years/sections */
+        [id^="mermaid-"] g.section:nth-of-type(4n+1) rect:not(.hitbox),
+        [id^="mermaid-"] g.milestone:nth-of-type(4n+1) rect:not(.hitbox) {
+            fill: var(--primary-color) !important;
+            fill-opacity: 0.15 !important;
+            stroke: var(--primary-color) !important;
+        }
+
+        [id^="mermaid-"] g.section:nth-of-type(4n+2) rect:not(.hitbox),
+        [id^="mermaid-"] g.milestone:nth-of-type(4n+2) rect:not(.hitbox) {
+            fill: #5a6fd8 !important;
+            /* Soft Blue */
+            fill-opacity: 0.15 !important;
+            stroke: #5a6fd8 !important;
+        }
+
+        [id^="mermaid-"] g.section:nth-of-type(4n+3) rect:not(.hitbox),
+        [id^="mermaid-"] g.milestone:nth-of-type(4n+3) rect:not(.hitbox) {
+            fill: #805ad5 !important;
+            /* Soft Purple */
+            fill-opacity: 0.15 !important;
+            stroke: #805ad5 !important;
+        }
+
+        [id^="mermaid-"] g.section:nth-of-type(4n+4) rect:not(.hitbox),
+        [id^="mermaid-"] g.milestone:nth-of-type(4n+4) rect:not(.hitbox) {
+            fill: #319795 !important;
+            /* Teal */
+            fill-opacity: 0.15 !important;
+            stroke: #319795 !important;
+        }
+
+        /* Fallback for other rects to be subtle */
+        [id^="mermaid-"] g rect:not(.hitbox) {
+            stroke-width: 2px !important;
+        }
+
+        /* Explicitly style the hitboxes to be invisible */
+        .hitbox {
+            fill: rgba(0, 0, 0, 0) !important;
+            stroke: none !important;
+        }
+
+        /* Text visibility - FORCE High Contrast */
+        [id^="mermaid-"] g text {
+            fill: var(--text-primary) !important;
+            color: var(--text-primary) !important;
+            opacity: 1 !important;
+            z-index: 100 !important;
+            font-weight: 500 !important;
+        }
+
+        /* Lines */
+        [id^="mermaid-"] line {
+            stroke: var(--primary-color) !important;
+            stroke-width: 2px !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <span id="theme-icon">☀️</span>
+    </button>
+
+    <div class="container">
+        <div class="graph-container" id="graph-container">
+            <!-- Controls -->
+            <div class="controls">
+                <button class="btn" onclick="resetZoom()">🎯 Fit View</button>
+                <button class="btn" onclick="downloadSVG()">💾 Download</button>
+            </div>
+
+            <div id="svg-container">
+                <div class="mermaid" id="mermaid-chart">
+                    <!-- Mermaid Syntax Injected Here -->
+                </div>
+            </div>
+            <!-- Floating Tooltip -->
+            <div id="tooltip" class="tooltip"></div>
+        </div>
+
+        <div class="sidebar">
+            <div id="panel-content">
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <div class="detail-text">Waiting for data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* [INJECTION_START] */
+        const architectureData = null;
+        /* [INJECTION_END] */
+
+        // --- Theme Logic ---
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+
+            // Re-render mermaid with new theme variables
+            renderTimeline();
+        }
+
+        async function renderTimeline() {
+            if (!architectureData || !architectureData.mermaid_syntax) return;
+
+            const chartDiv = document.getElementById('mermaid-chart');
+            // Reset content to raw syntax
+            chartDiv.removeAttribute('data-processed'); // Important for mermaid re-run
+            chartDiv.textContent = architectureData.mermaid_syntax;
+            chartDiv.innerHTML = ''; // Clear SVG
+
+            // Determine colors based on current theme
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const lineColor = isDark ? '#ffffff' : '#2c3e50';
+            const textColor = isDark ? '#ffffff' : '#2c3e50';
+            const primaryColor = isDark ? '#7c93f0' : '#667eea';
+
+            // Re-initialize mermaid
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: 'base',
+                securityLevel: 'loose',
+                themeVariables: {
+                    primaryColor: primaryColor,
+                    primaryTextColor: textColor,
+                    primaryBorderColor: primaryColor,
+                    lineColor: lineColor,
+                    textColor: textColor,
+                    background: 'transparent',
+                    mainBkg: 'transparent',
+
+                    // Force a "Professional Blue" palette for timeline sections
+                    // Mermaid often uses pieX or cScaleX variables for sequence/timeline coloring
+                    pie1: primaryColor,
+                    pie2: isDark ? '#5a6fd8' : '#7c93f0',
+                    pie3: isDark ? '#4c51bf' : '#90cdf4',
+                    pie4: isDark ? '#434190' : '#63b3ed',
+                    pie5: isDark ? '#2c5282' : '#3182ce',
+
+                    cScale0: primaryColor,
+                    cScale1: isDark ? '#5a6fd8' : '#7c93f0',
+                    cScale2: isDark ? '#4c51bf' : '#90cdf4',
+
+                    fontSize: '16px',
+                    fontFamily: 'Inter',
+                    edgeLabelBackground: isDark ? '#1a202c' : '#ffffff',
+                }
+            });
+
+            // Insert syntax again
+            chartDiv.textContent = architectureData.mermaid_syntax;
+
+            try {
+                // Run mermaid
+                await mermaid.run({
+                    nodes: [chartDiv]
+                });
+
+                // --- Post-Render Interactivity ---
+                const svg = chartDiv.querySelector('svg');
+                if (svg) {
+                    // Advanced Hitbox Injection
+                    // We iterate over groups, calculate their bounding box, and inject a transparent rect 
+                    // to ensure the "whole box" is clickable.
+
+                    // 1. Target potential containers
+                    const containers = svg.querySelectorAll('g');
+
+                    containers.forEach(group => {
+                        // Filter interesting groups (must contain text)
+                        const textNode = group.querySelector('text');
+                        if (!textNode || !textNode.textContent.trim()) return;
+
+                        const textContent = textNode.textContent.trim();
+
+                        try {
+                            // Calculate Bounding Box of the group content
+                            const bbox = group.getBBox();
+
+                            // Add some padding
+                            const padding = 5;
+
+                            // Create Hitbox Rect
+                            const hitBox = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            hitBox.setAttribute("x", bbox.x - padding);
+                            hitBox.setAttribute("y", bbox.y - padding);
+                            hitBox.setAttribute("width", bbox.width + (padding * 2));
+                            hitBox.setAttribute("height", bbox.height + (padding * 2));
+                            hitBox.setAttribute("fill", "transparent"); // Invisible
+                            hitBox.setAttribute("class", "hitbox");
+                            hitBox.setAttribute("fill", "rgba(0,0,0,0)"); // Explicitly clear fill
+                            hitBox.setAttribute("stroke", "none");
+                            hitBox.style.cursor = "pointer";
+
+                            // FIX: Append to END to ensure it sits ON TOP of text/rects
+                            // This guarantees the hover event is captured by our hitbox overlay
+                            group.appendChild(hitBox);
+
+                            // Interaction Logic
+                            const handleHover = (e) => {
+                                e.stopPropagation();
+
+                                // Lookup description from JSON data
+                                let desc = "Click for details";
+                                let fullDetails = "Part of the timeline.";
+
+                                // ... data lookup ...
+                                if (architectureData && architectureData.events) {
+                                    // Try to find matching event by name (case insensitive for robustness)
+                                    const eventData = architectureData.events.find(ev =>
+                                        ev.name.toLowerCase() === textContent.toLowerCase() ||
+                                        ev.year === textContent
+                                    );
+                                    if (eventData) {
+                                        // Tooltip = Summary (One-liner), Panel = Description (Context)
+                                        desc = eventData.summary || eventData.description || "Click for details";
+                                        fullDetails = eventData.description || eventData.summary || "Part of the timeline.";
+                                    }
+                                }
+
+                                const isYear = textContent.match(/^\d{4}$/);
+                                const type = isYear ? "Time Period" : "Timeline Event";
+
+                                showTooltip(textContent, type, desc);
+                                showPanel(textContent, {
+                                    "Type": type,
+                                    "Content": textContent,
+                                    "Description": fullDetails,
+                                    "Context": architectureData.metadata.title
+                                });
+                            };
+
+                            hitBox.onmouseover = handleHover;
+                            hitBox.onmouseout = hideTooltip;
+
+                            hitBox.onclick = (e) => {
+                                e.stopPropagation();
+                                showPanel(textContent, {
+                                    "Type": "Selected",
+                                    "Content": textContent,
+                                    "Description": "Detailed view of the specific event."
+                                });
+                            };
+
+                        } catch (e) {
+                            console.warn("Could not create hitbox for group", e);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Mermaid error:", err);
+                chartDiv.textContent = "Error rendering chart. Please check console.";
+            }
+        }
+
+        // --- Pan/Zoom Logic ---
+        const container = document.getElementById('graph-container');
+        const content = document.getElementById('svg-container');
+
+        let scale = 1;
+        let pointX = 0;
+        let pointY = 0;
+        let isPanning = false;
+        let start = { x: 0, y: 0 };
+
+        function setTransform() {
+            content.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+        }
+
+        function resetZoom() {
+            scale = 1;
+            pointX = 0;
+            pointY = 0;
+            setTransform();
+        }
+
+        container.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.controls') || e.target.closest('.theme-toggle')) return;
+            isPanning = true;
+            start = { x: e.clientX - pointX, y: e.clientY - pointY };
+            container.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mouseup', () => {
+            isPanning = false;
+            container.style.cursor = 'grab';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            pointX = e.clientX - start.x;
+            pointY = e.clientY - start.y;
+            setTransform();
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = -e.deltaY;
+            let newScale = (delta > 0) ? (scale * 1.1) : (scale / 1.1);
+            if (newScale < 0.1) newScale = 0.1;
+            if (newScale > 5) newScale = 5;
+            scale = newScale;
+            setTransform();
+        });
+
+        function downloadSVG() {
+            const svg = document.querySelector("#mermaid-chart svg");
+            if (!svg) { alert("No chart to download"); return; }
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "timeline.svg";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- UI Helper Functions ---
+        const tooltip = document.getElementById('tooltip');
+        let isTooltipVisible = false;
+
+        document.addEventListener('mousemove', (e) => {
+            if (isTooltipVisible && tooltip) {
+                // Offset tooltip
+                const x = e.clientX + 15;
+                const y = e.clientY + 15;
+                const maxX = window.innerWidth - 250;
+                const finalX = x > maxX ? e.clientX - 260 : x;
+                tooltip.style.left = `${finalX}px`;
+                tooltip.style.top = `${y}px`;
+            }
+        });
+
+        function showTooltip(name, type, desc) {
+            if (!tooltip) return;
+            isTooltipVisible = true;
+            tooltip.innerHTML = `
+                <div class="tooltip-type">${type}</div>
+                <div class="tooltip-header">${name}</div>
+                <div class="tooltip-desc">${desc || 'No description provided.'}</div>
+            `;
+            tooltip.style.opacity = '1';
+        }
+
+        function hideTooltip() {
+            if (!tooltip) return;
+            isTooltipVisible = false;
+            tooltip.style.opacity = '0';
+        }
+
+        function showPanel(title, details) {
+            const panel = document.getElementById('panel-content');
+            if (!panel) return;
+
+            let html = `<h2>${title}</h2>`;
+            for (const [key, value] of Object.entries(details)) {
+                if (value) {
+                    html += `<div class="detail-item">
+                        <span class="detail-label">${key}</span>
+                        <div class="detail-text">${value}</div>
+                    </div>`;
+                }
+            }
+            panel.innerHTML = html;
+        }
+
+        // Initial Render
+        if (architectureData) {
+            renderTimeline();
+
+            const panel = document.getElementById('panel-content');
+            if (architectureData.metadata) {
+                let html = `<h2>${architectureData.metadata.title}</h2>`;
+                html += `<div class="detail-item">
+                    <span class="detail-label">Summary</span>
+                    <div class="detail-text">${architectureData.metadata.summary}</div>
+                </div>`;
+                panel.innerHTML = html;
+            }
+        }
+    </script>
+</body>
+
+</html>
