@@ -59,11 +59,32 @@ def load_sequence_template():
     except FileNotFoundError:
         return None
 
+def load_timeline_prompt():
+    try:
+        with open("timeline_prompt.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+def load_timeline_template():
+    try:
+        with open("timeline_template.html", "r", encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
 def validate_json(json_str):
     try:
-        # Try to clean up markdown code blocks if present
-        json_str = re.sub(r'```json\s*', '', json_str)
-        json_str = re.sub(r'```\s*$', '', json_str)
+        # Regex to find JSON block enclosed in ```json ... ``` or just { ... }
+        match = re.search(r'```json\s*(\{.*?\})\s*```', json_str, re.DOTALL)
+        if match:
+             json_str = match.group(1)
+        else:
+             # Fallback: Try to find the first outer {} block
+             match_fallback = re.search(r'\{.*\}', json_str, re.DOTALL)
+             if match_fallback:
+                 json_str = match_fallback.group(0)
+        
         data = json.loads(json_str)
         
         # Determine schema validation type
@@ -75,6 +96,11 @@ def validate_json(json_str):
             if not isinstance(data.get('events'), list):
                  print("Validation Error: 'events' must be a list")
                  return None
+
+            return data
+
+        # Timeline Schema
+        if 'mermaid_syntax' in data:
             return data
 
         # Graph/Mindmap Schema (Fallback)
@@ -155,6 +181,11 @@ def generate_graph(topic, api_key, graph_type="Graph"):
         html_loader = load_sequence_template
         if not prompt_template:
             return None, None, "Sequence prompt template (sequence_prompt.txt) not found."
+    elif graph_type == "Timeline":
+        prompt_template = load_timeline_prompt()
+        html_loader = load_timeline_template
+        if not prompt_template:
+            return None, None, "Timeline prompt template (timeline_prompt.txt) not found."
     else:
         prompt_template = load_prompt_template()
         
@@ -265,7 +296,7 @@ def main():
             st.warning("GOOGLE_API_KEY missing in .env")
             
         # Graph Type Selector
-        graph_type = st.radio("Structure", ["Graph", "Mindmap", "Sequence"], horizontal=True, help="Choose 'Graph' for hierarchical flows, 'Mindmap' for radial brainstorming, or 'Sequence' for interaction diagrams.")
+        graph_type = st.radio("Structure", ["Graph", "Mindmap", "Sequence", "Timeline"], horizontal=True, help="Choose 'Graph' for hierarchical flows, 'Mindmap' for radial brainstorming, 'Sequence' for interaction diagrams, or 'Timeline' for chronological events.")
         
         # Chat Interface
         chat_container = st.container(height=700) 
