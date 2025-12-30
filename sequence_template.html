@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Diagram Viewer</title>
+
+    <!-- Import fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* Exact CSS from template.html */
+
+        /* CSS Custom Properties - Light Theme (Default) */
+        :root {
+            /* Color Palette */
+            --primary-color: #667eea;
+            --primary-hover: #5a6fd8;
+            --primary-light: #e3f2fd;
+            --secondary-color: #6c757d;
+            --secondary-hover: #545b62;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --warning-color: #ffc107;
+            --warning-bg: #fff3cd;
+            --warning-border: #ffeaa7;
+            --warning-text: #856404;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+
+            /* Code Colors */
+            --code-bg: #2d3748;
+            --code-text: #e2e8f0;
+
+            /* Background Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --bg-overlay: rgba(0, 0, 0, 0.05);
+
+            /* Text Colors */
+            --text-primary: #2c3e50;
+            --text-secondary: #495057;
+            --text-tertiary: #6c757d;
+            --text-muted: #adb5bd;
+            --text-inverse: #ffffff;
+
+            /* Border Colors */
+            --border-color: #dee2e6;
+            --border-light: #e9ecef;
+            --border-dark: #adb5bd;
+
+            /* Shadow */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+            --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+            --shadow-color: rgba(0, 0, 0, 0.05);
+
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-full: 50px;
+
+            /* Typography */
+            --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-family-mono: 'JetBrains Mono', 'Courier New', monospace;
+            --font-size-xs: 0.75rem;
+            --font-size-sm: 0.875rem;
+            --font-size-base: 1rem;
+            --font-size-lg: 1.125rem;
+            --font-size-xl: 1.25rem;
+            --font-size-2xl: 1.5rem;
+            --font-size-3xl: 1.875rem;
+            --font-weight-normal: 400;
+            --font-weight-medium: 500;
+            --font-weight-semibold: 600;
+
+            /* Transitions */
+            --transition-base: 0.2s ease-out;
+
+            /* Grid */
+            --grid-color: rgba(102, 126, 234, 0.12);
+            --grid-size: 32px;
+        }
+
+        /* Dark Theme */
+        [data-theme='dark'] {
+            /* Color Palette */
+            --primary-color: #7c93f0;
+            --primary-hover: #6b82e8;
+            --primary-light: #1a202c;
+            --success-bg: #2d5a3d;
+            --success-text: #68d391;
+            --warning-bg: #744210;
+            --warning-border: #975a16;
+            --warning-text: #fbb040;
+
+            /* Code Colors */
+            --code-bg: #1a202c;
+            --code-text: #e2e8f0;
+
+            /* Background Colors */
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --bg-tertiary: #4a5568;
+            --bg-overlay: rgba(255, 255, 255, 0.05);
+
+            /* Text Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #e2e8f0;
+            --text-tertiary: #cbd5e0;
+            --text-muted: #a0aec0;
+
+            /* Border Colors */
+            --border-color: #4a5568;
+            --border-light: #2d3748;
+            --border-dark: #718096;
+
+            /* Shadow */
+            --shadow-color: rgba(0, 0, 0, 0.3);
+
+            /* Grid */
+            --grid-color: rgba(124, 147, 240, 0.15);
+        }
+
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-family-base);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            overflow: hidden;
+            line-height: 1.6;
+            font-weight: var(--font-weight-normal);
+            transition: background-color var(--transition-base), color var(--transition-base);
+        }
+
+        /* Typography */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            line-height: 1.25;
+            margin-bottom: var(--spacing-md);
+        }
+
+        h2 {
+            font-size: var(--font-size-2xl);
+        }
+
+        h3 {
+            font-size: var(--font-size-xl);
+        }
+
+        p {
+            margin-bottom: var(--spacing-md);
+            color: var(--text-secondary);
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Graph Area - 80% (Requested) */
+        .graph-container {
+            width: 80%;
+            height: 100vh;
+            position: relative;
+            background: var(--bg-primary);
+            border-right: 2px solid var(--border-color);
+            transition: background-color var(--transition-base), border-color var(--transition-base);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow: hidden;
+            /* For Pan/Zoom */
+            cursor: grab;
+        }
+
+        .graph-container:active {
+            cursor: grabbing;
+        }
+
+        /* Grid Background on Container */
+        .graph-container {
+            background-color: var(--bg-secondary);
+            background-image:
+                linear-gradient(0deg, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+            background-position: 0 0, 0 0;
+        }
+
+        #svg-container {
+            transform-origin: 0 0;
+            transition: transform 0.1s ease-out;
+            /* Allow SVG to overflow for panning */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Sidebar - 20% (Requested) */
+        .sidebar {
+            width: 20%;
+            height: 100vh;
+            background: var(--bg-secondary);
+            padding: var(--spacing-md);
+            overflow-y: auto;
+            border-left: 1px solid var(--border-color);
+            transition: background-color var(--transition-base), border-color var(--transition-base);
+        }
+
+        /* Card Styles for Sidebar Details */
+        .detail-item {
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-md);
+            border: 1px solid var(--border-color);
+            transition: all var(--transition-base);
+        }
+
+        .detail-label {
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
+            display: block;
+            font-size: var(--font-size-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-text {
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            line-height: 1.4;
+        }
+
+        /* SVG Styles - Adapted to use vars */
+        svg {
+            font-family: var(--font-family-base);
+            overflow: visible;
+        }
+
+        .participant-box {
+            fill: var(--primary-light);
+            stroke: var(--primary-color);
+            stroke-width: 1.5;
+            cursor: pointer;
+            transition: fill 0.2s;
+        }
+
+        [data-theme='dark'] .participant-box {
+            fill: #2c5282;
+            stroke: #63b3ed;
+        }
+
+        .participant-box:hover {
+            fill: #b3e5fc;
+        }
+
+        [data-theme='dark'] .participant-box:hover {
+            fill: #2b6cb0;
+        }
+
+        .participant-text {
+            fill: var(--primary-color);
+            font-size: 14px;
+            font-weight: 600;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        [data-theme='dark'] .participant-text {
+            fill: #bee3f8;
+        }
+
+        .actor-path {
+            fill: none;
+            stroke: var(--primary-color);
+            stroke-width: 2;
+        }
+
+        [data-theme='dark'] .actor-path {
+            stroke: #63b3ed;
+        }
+
+        .activation-bar {
+            fill: var(--bg-primary);
+            stroke: var(--primary-color);
+            stroke-width: 1;
+        }
+
+        [data-theme='dark'] .activation-bar {
+            fill: var(--bg-secondary);
+            stroke: #63b3ed;
+        }
+
+        .fragment-box {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 1.5;
+            stroke-dasharray: 5, 2;
+        }
+
+        [data-theme='dark'] .fragment-box {
+            stroke: var(--text-tertiary);
+        }
+
+        .fragment-label-box {
+            fill: var(--bg-tertiary);
+            stroke: var(--text-secondary);
+            stroke-width: 1;
+        }
+
+        [data-theme='dark'] .fragment-label-box {
+            fill: var(--bg-tertiary);
+            stroke: var(--text-tertiary);
+        }
+
+        .fragment-label {
+            font-size: 11px;
+            font-weight: bold;
+            fill: var(--text-primary);
+            text-anchor: start;
+        }
+
+        .lifeline {
+            stroke: var(--primary-color);
+            stroke-width: 1;
+            stroke-dasharray: 4, 2;
+        }
+
+        [data-theme='dark'] .lifeline {
+            stroke: #ffffff;
+            opacity: 0.6;
+        }
+
+        .message-line {
+            stroke: var(--text-primary);
+            stroke-width: 1.5;
+            cursor: pointer;
+        }
+
+        .message-line.dotted {
+            stroke-dasharray: 4, 3;
+        }
+
+        .message-line:hover {
+            stroke: var(--text-secondary);
+            stroke-width: 2.5;
+        }
+
+        .arrow-head {
+            fill: var(--text-primary);
+        }
+
+        [data-theme='dark'] .arrow-head {
+            fill: var(--text-primary);
+        }
+
+        .message-text {
+            font-size: 13px;
+            fill: var(--text-primary);
+            text-anchor: middle;
+            background-color: var(--bg-primary);
+            cursor: pointer;
+        }
+
+        .message-text:hover {
+            fill: var(--danger-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Standard Container Layout -->
+    <div class="container">
+        <!-- Graph Area (80%) -->
+        <div class="graph-container" id="graph-container">
+            <div id="svg-container">
+                <!-- SVG will be injected here -->
+            </div>
+        </div>
+
+        <!-- Sidebar (20%) -->
+        <div class="sidebar">
+            <div id="panel-content">
+                <div class="empty-state">
+                    <h3>Detail View</h3>
+                    <p>Hover over an element to see details.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Injection -->
+    <script>
+        /* [INJECTION_START] */
+        const architectureData = null;
+        /* [INJECTION_END] */
+    </script>
+
+    <script>
+        const panelContent = document.getElementById('panel-content');
+        const svgContainer = document.getElementById('svg-container');
+        const graphContainer = document.getElementById('graph-container');
+
+        // --- Config ---
+        const CONFIG = {
+            participantWidth: 120,
+            participantHeight: 40,
+            participantMargin: 80,
+            topMargin: 20,
+            messageHeight: 50,
+            textOffset: 5
+        };
+
+        // --- Pan/Zoom State ---
+        let scale = 1;
+        let pointX = 20; // Initial padding
+        let pointY = 20;
+        let isPanning = false;
+        let start = { x: 0, y: 0 };
+
+        function setTransform() {
+            svgContainer.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+        }
+
+        graphContainer.addEventListener('mousedown', (e) => {
+            isPanning = true;
+            start = { x: e.clientX - pointX, y: e.clientY - pointY };
+            graphContainer.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isPanning) {
+                isPanning = false;
+                graphContainer.style.cursor = 'grab';
+            }
+        });
+
+        graphContainer.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            pointX = e.clientX - start.x;
+            pointY = e.clientY - start.y;
+            setTransform();
+        });
+
+        graphContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const xs = (e.clientX - pointX) / scale;
+            const ys = (e.clientY - pointY) / scale;
+            const delta = -e.deltaY;
+
+            // Limit scale
+            let newScale = (delta > 0) ? (scale * 1.1) : (scale / 1.1);
+            if (newScale < 0.1) newScale = 0.1;
+            if (newScale > 5) newScale = 5;
+
+            scale = newScale;
+            pointX = e.clientX - xs * scale;
+            pointY = e.clientY - ys * scale;
+
+            setTransform();
+        });
+
+        function showPanel(title, details) {
+            let html = `<h2>${title}</h2>`;
+            for (const [key, value] of Object.entries(details)) {
+                if (value) {
+                    html += `<div class="detail-item">
+                        <span class="detail-label">${key}</span>
+                        <div class="detail-text">${value}</div>
+                    </div>`;
+                }
+            }
+            panelContent.innerHTML = html;
+        }
+
+        function renderDiagram(data) {
+            if (!data) return;
+            svgContainer.innerHTML = '';
+
+            scale = 1;
+            pointX = 20;
+            pointY = 20;
+            setTransform();
+
+            const participants = data.participants || [];
+            if (participants.length === 0) {
+                svgContainer.innerHTML = '<p class="empty-state">No participants found.</p>';
+                return;
+            }
+
+            // Map participant IDs to X coordinates
+            const participantX = {};
+            let currentX = CONFIG.participantMargin / 2;
+
+            participants.forEach(p => {
+                participantX[p.id] = currentX + CONFIG.participantWidth / 2;
+                currentX += CONFIG.participantWidth + CONFIG.participantMargin;
+            });
+
+            const totalWidth = currentX;
+            const events = data.events || [];
+            let currentY = CONFIG.topMargin + CONFIG.participantHeight + 40;
+            let totalHeight = currentY + (events.length * CONFIG.messageHeight) + 100;
+
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", totalWidth);
+            svg.setAttribute("height", totalHeight);
+
+            const defs = document.createElementNS(svgNS, "defs");
+
+            // Solid arrow
+            const marker = document.createElementNS(svgNS, "marker");
+            marker.setAttribute("id", "arrowhead");
+            marker.setAttribute("markerWidth", "10");
+            marker.setAttribute("markerHeight", "7");
+            marker.setAttribute("refX", "9");
+            marker.setAttribute("refY", "3.5");
+            marker.setAttribute("orient", "auto");
+            marker.setAttribute("class", "arrow-head");
+            const polygon = document.createElementNS(svgNS, "polygon");
+            polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
+            marker.appendChild(polygon);
+            defs.appendChild(marker);
+
+            // Open arrow
+            const markerOpen = document.createElementNS(svgNS, "marker");
+            markerOpen.setAttribute("id", "arrowhead-open");
+            markerOpen.setAttribute("markerWidth", "10");
+            markerOpen.setAttribute("markerHeight", "7");
+            markerOpen.setAttribute("refX", "9");
+            markerOpen.setAttribute("refY", "3.5");
+            markerOpen.setAttribute("orient", "auto");
+            markerOpen.setAttribute("class", "arrow-head");
+            const polyline = document.createElementNS(svgNS, "polyline");
+            polyline.setAttribute("points", "0 0, 10 3.5, 0 7");
+            polyline.setAttribute("fill", "none");
+            polyline.setAttribute("stroke", "currentColor");
+            polyline.setAttribute("stroke-width", "1.5");
+            markerOpen.appendChild(polyline);
+            defs.appendChild(markerOpen);
+
+            svg.appendChild(defs);
+
+            // Draw Participants (Top) and Lifelines
+            participants.forEach(p => {
+                const cx = participantX[p.id];
+                // Lifeline
+                const line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", cx);
+                line.setAttribute("y1", CONFIG.topMargin + CONFIG.participantHeight);
+                line.setAttribute("x2", cx);
+                line.setAttribute("y2", totalHeight - 20);
+                line.setAttribute("class", "lifeline");
+                svg.appendChild(line);
+
+                if (p.type === 'Actor') {
+                    // Draw Stick Figure
+                    const headRadius = 8;
+                    const bodyLength = 15;
+                    const armSpan = 15;
+                    const legSpan = 15;
+                    const yOffset = CONFIG.topMargin + 10;
+
+                    const pathD = `
+                        M ${cx} ${yOffset} 
+                        m -${headRadius}, 0 
+                        a ${headRadius},${headRadius} 0 1,0 ${headRadius * 2},0 
+                        a ${headRadius},${headRadius} 0 1,0 -${headRadius * 2},0 
+                        M ${cx} ${yOffset + headRadius} 
+                        L ${cx} ${yOffset + headRadius + bodyLength} 
+                        M ${cx - armSpan / 2} ${yOffset + headRadius + bodyLength / 3} 
+                        L ${cx + armSpan / 2} ${yOffset + headRadius + bodyLength / 3} 
+                        M ${cx} ${yOffset + headRadius + bodyLength} 
+                        L ${cx - legSpan / 2} ${yOffset + headRadius + bodyLength + legSpan} 
+                        M ${cx} ${yOffset + headRadius + bodyLength} 
+                        L ${cx + legSpan / 2} ${yOffset + headRadius + bodyLength + legSpan}
+                    `;
+
+                    const path = document.createElementNS(svgNS, "path");
+                    path.setAttribute("d", pathD);
+                    path.setAttribute("class", "actor-path");
+                    svg.appendChild(path);
+
+                    // Invisible Click Box
+                    const hitBox = document.createElementNS(svgNS, "rect");
+                    hitBox.setAttribute("x", cx - 20);
+                    hitBox.setAttribute("y", CONFIG.topMargin);
+                    hitBox.setAttribute("width", 40);
+                    hitBox.setAttribute("height", 50);
+                    hitBox.setAttribute("fill", "transparent");
+                    hitBox.setAttribute("cursor", "pointer");
+                    hitBox.onmouseover = () => showPanel(p.label, { "Type": "Actor", "Description": p.description });
+                    svg.appendChild(hitBox);
+
+                } else {
+                    // Standard Box
+                    const rect = document.createElementNS(svgNS, "rect");
+                    rect.setAttribute("x", cx - CONFIG.participantWidth / 2);
+                    rect.setAttribute("y", CONFIG.topMargin);
+                    rect.setAttribute("width", CONFIG.participantWidth);
+                    rect.setAttribute("height", CONFIG.participantHeight);
+                    rect.setAttribute("rx", 5);
+                    rect.setAttribute("class", "participant-box");
+                    rect.onmouseover = () => showPanel(p.label, { "Type": p.type, "Description": p.description });
+                    svg.appendChild(rect);
+                }
+
+                const text = document.createElementNS(svgNS, "text");
+                text.setAttribute("x", cx);
+                text.setAttribute("y", CONFIG.topMargin + CONFIG.participantHeight / 2 + (p.type === 'Actor' ? 35 : 5));
+                text.setAttribute("class", "participant-text");
+                text.style.fontWeight = p.type === 'Actor' ? 'bold' : '600';
+                text.textContent = p.label;
+                svg.appendChild(text);
+            });
+
+            // Draw Activations
+            const activations = data.activations || [];
+            activations.forEach(act => {
+                const cx = participantX[act.participant];
+                if (!cx) return;
+
+                // Simple height calculation based on steps
+                // We assume steps map linearly to Y positions
+                // Start Y = header + (startStep * msgHeight)
+                const startY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.startStep * CONFIG.messageHeight) - (CONFIG.messageHeight / 2);
+                const endY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.endStep * CONFIG.messageHeight) + (CONFIG.messageHeight / 2);
+                const height = Math.max(endY - startY, CONFIG.messageHeight); // Min height
+
+                const rect = document.createElementNS(svgNS, "rect");
+                rect.setAttribute("x", cx - 5); // 10px wide bar
+                rect.setAttribute("y", startY);
+                rect.setAttribute("width", 10);
+                rect.setAttribute("height", height);
+                rect.setAttribute("class", "activation-bar");
+                svg.appendChild(rect);
+            });
+
+            // PRE-CALCULATE STEP POSITIONS FOR FRAGMENTS
+            const stepY = {};
+            let tempY = currentY;
+            events.forEach(ev => {
+                tempY += CONFIG.messageHeight;
+                ev._y = tempY; // Store calculated Y
+                if (ev.step) stepY[ev.step] = tempY;
+            });
+
+            // Draw Fragments (Behind events)
+            const fragments = data.fragments || [];
+            fragments.forEach(frag => {
+                const startStepY = stepY[frag.startStep] ? stepY[frag.startStep] - (CONFIG.messageHeight) : CONFIG.topMargin + CONFIG.participantHeight + 20;
+                const endStepY = stepY[frag.endStep] ? stepY[frag.endStep] + (CONFIG.messageHeight / 3) : totalHeight - 20;
+
+                const x = CONFIG.participantMargin / 2 - 20; // Start before first participant
+                const width = totalWidth - CONFIG.participantMargin + 40;
+                const height = endStepY - startStepY;
+
+                // Group for fragment
+                const g = document.createElementNS(svgNS, "g");
+
+                // Box
+                const rect = document.createElementNS(svgNS, "rect");
+                rect.setAttribute("x", x);
+                rect.setAttribute("y", startStepY);
+                rect.setAttribute("width", width);
+                rect.setAttribute("height", height);
+                rect.setAttribute("class", "fragment-box");
+                g.appendChild(rect);
+
+                // Label Box (top-left corner)
+                const labelWidth = 60;
+                const labelHeight = 20;
+                const labelRect = document.createElementNS(svgNS, "path");
+                labelRect.setAttribute("d", `M ${x} ${startStepY} h ${labelWidth} l 10 10 v ${labelHeight - 10} h -${labelWidth + 10} z`);
+                labelRect.setAttribute("class", "fragment-label-box");
+                g.appendChild(labelRect);
+
+                // Type Label (alt, loop)
+                const typeText = document.createElementNS(svgNS, "text");
+                typeText.setAttribute("x", x + 5);
+                typeText.setAttribute("y", startStepY + 14);
+                typeText.setAttribute("class", "fragment-label");
+                typeText.textContent = frag.type || "alt";
+                g.appendChild(typeText);
+
+                // Condition Label (if descriptive)
+                if (frag.condition) {
+                    const condText = document.createElementNS(svgNS, "text");
+                    condText.setAttribute("x", x + 10 + labelWidth);
+                    condText.setAttribute("y", startStepY + 14);
+                    condText.setAttribute("class", "fragment-label");
+                    condText.style.fontWeight = "normal";
+                    condText.textContent = `[${frag.condition}]`;
+                    g.appendChild(condText);
+                }
+
+                svg.appendChild(g);
+            });
+
+            // Draw Events (Actually render them using pre-calculated Y)
+            events.forEach(ev => {
+                const y = ev._y; // Use pre-calc Y
+
+                if (ev.type === "message") {
+                    const x1 = participantX[ev.source];
+                    const x2 = participantX[ev.target];
+
+                    if (x1 !== undefined && x2 !== undefined) {
+
+                        if (ev.source === ev.target) {
+                            // SELF-CALL (Loop)
+                            const loopWidth = 30;
+                            const loopHeight = 20;
+                            // Path: Start at x1,y -> right -> down -> left
+                            const pathD = `M ${x1} ${y} L ${x1 + loopWidth} ${y} L ${x1 + loopWidth} ${y + loopHeight} L ${x1} ${y + loopHeight}`;
+
+                            const path = document.createElementNS(svgNS, "path");
+                            path.setAttribute("d", pathD);
+                            path.setAttribute("class", "message-line " + (ev.lineType === 'dotted' ? 'dotted' : ''));
+                            path.setAttribute("fill", "none");
+                            const markerId = ev.arrowType === 'open_arrow' ? 'url(#arrowhead-open)' : 'url(#arrowhead)';
+                            path.setAttribute("marker-end", markerId);
+
+                            path.onmouseover = () => showPanel("Internal Process", {
+                                "Participant": ev.source,
+                                "Action": ev.label
+                            });
+                            svg.appendChild(path);
+
+                            const text = document.createElementNS(svgNS, "text");
+                            text.setAttribute("x", x1 + loopWidth + 10);
+                            text.setAttribute("y", y + 15);
+                            text.setAttribute("class", "message-text");
+                            text.style.textAnchor = "start"; // Align left of loop
+                            text.textContent = ev.label;
+                            text.onmouseover = path.onmouseover;
+                            svg.appendChild(text);
+
+                        } else {
+                            // STANDARD MESSAGE
+                            const line = document.createElementNS(svgNS, "line");
+                            line.setAttribute("x1", x1);
+                            line.setAttribute("y1", y);
+                            line.setAttribute("x2", x2);
+                            line.setAttribute("y2", y);
+                            line.setAttribute("class", "message-line " + (ev.lineType === 'dotted' ? 'dotted' : ''));
+                            const markerId = ev.arrowType === 'open_arrow' ? 'url(#arrowhead-open)' : 'url(#arrowhead)';
+                            line.setAttribute("marker-end", markerId);
+
+                            // Hover event
+                            line.onmouseover = () => showPanel("Message Details", {
+                                "From": ev.source,
+                                "To": ev.target,
+                                "Message": ev.label
+                            });
+
+                            svg.appendChild(line);
+
+                            const text = document.createElementNS(svgNS, "text");
+                            text.setAttribute("x", (x1 + x2) / 2);
+                            text.setAttribute("y", y - 5);
+                            text.setAttribute("class", "message-text");
+                            text.textContent = ev.label;
+                            text.onmouseover = line.onmouseover;
+                            svg.appendChild(text);
+                        }
+                    }
+                }
+            });
+
+            svgContainer.appendChild(svg);
+        }
+
+        // Init
+        if (architectureData) {
+            if (architectureData.metadata) {
+                showPanel(architectureData.metadata.title, { "Summary": architectureData.metadata.summary });
+            }
+            renderDiagram(architectureData);
+        } else {
+            svgContainer.innerHTML = "<div class='empty-state'><h3>Analysis in Progress...</h3><p>Waiting for sequence data.</p></div>";
+        }
+
+    </script>
+</body>
+
+</html>
