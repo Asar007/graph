@@ -30,9 +30,9 @@ Use this EXACT JSON structure.
 {
   "metadata": { "topic": "...", "contentType": "mindmap", "nodeCount": 0 },
   "nodes": [
-    { "id": "root", "data": { "label": "Main Topic", "type": "root", "summary": "Central overview." } },
-    { "id": "cat1", "data": { "label": "Category", "type": "category", "summary": "Branch explanation." } },
-    { "id": "leaf1", "data": { "label": "Detail", "type": "leaf", "summary": "Specific fact." } }
+    { "id": "root", "data": { "label": "Main Topic", "type": "root", "summary": "Central overview (2-3 sentences).", "hoverSummary": "Short one-liner." } },
+    { "id": "cat1", "data": { "label": "Category", "type": "category", "summary": "Branch explanation (2-3 sentences).", "hoverSummary": "Short one-liner." } },
+    { "id": "leaf1", "data": { "label": "Detail", "type": "leaf", "summary": "Specific fact (2-3 sentences).", "hoverSummary": "Short one-liner." } }
   ],
   "edges": [
     { "id": "e1", "source": "root", "target": "cat1", "type": "connects" },
