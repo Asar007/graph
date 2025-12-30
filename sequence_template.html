@@ -95,6 +95,9 @@
             /* Grid */
             --grid-color: rgba(102, 126, 234, 0.12);
             --grid-size: 32px;
+
+            /* Tooltip Z-Index */
+            --z-tooltip: 1000;
         }
 
         /* Dark Theme */
@@ -268,6 +271,44 @@
             line-height: 1.4;
         }
 
+        /* Tooltip Styles */
+        .tooltip {
+            position: absolute;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            box-shadow: var(--shadow-lg);
+            pointer-events: none;
+            z-index: var(--z-tooltip);
+            opacity: 0;
+            transition: opacity 0.1s ease-in-out;
+            min-width: 180px;
+            max-width: 300px;
+        }
+
+        .tooltip-header {
+            font-weight: var(--font-weight-semibold);
+            color: var(--primary-color);
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .tooltip-type {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .tooltip-desc {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
         /* SVG Styles - Adapted to use vars */
         svg {
             font-family: var(--font-family-base);
@@ -414,6 +455,8 @@
             <div id="svg-container">
                 <!-- SVG will be injected here -->
             </div>
+            <!-- Floating Tooltip -->
+            <div id="tooltip" class="tooltip"></div>
         </div>
 
         <!-- Sidebar (20%) -->
@@ -438,6 +481,7 @@
         const panelContent = document.getElementById('panel-content');
         const svgContainer = document.getElementById('svg-container');
         const graphContainer = document.getElementById('graph-container');
+        const tooltip = document.getElementById('tooltip');
 
         // --- Config ---
         const CONFIG = {
@@ -448,6 +492,39 @@
             messageHeight: 50,
             textOffset: 5
         };
+
+        // --- Tooltip Logic ---
+        let isTooltipVisible = false;
+
+        document.addEventListener('mousemove', (e) => {
+            if (isTooltipVisible) {
+                // Offset tooltip slightly from cursor
+                const x = e.clientX + 15;
+                const y = e.clientY + 15;
+
+                // Prevent overflow (basic)
+                const maxX = window.innerWidth - 250;
+                const finalX = x > maxX ? e.clientX - 260 : x;
+
+                tooltip.style.left = `${finalX}px`;
+                tooltip.style.top = `${y}px`;
+            }
+        });
+
+        function showTooltip(name, type, desc) {
+            isTooltipVisible = true;
+            tooltip.innerHTML = `
+                <div class="tooltip-type">${type}</div>
+                <div class="tooltip-header">${name}</div>
+                <div class="tooltip-desc">${desc || 'No description provided.'}</div>
+            `;
+            tooltip.style.opacity = '1';
+        }
+
+        function hideTooltip() {
+            isTooltipVisible = false;
+            tooltip.style.opacity = '0';
+        }
 
         // --- Pan/Zoom State ---
         let scale = 1;
@@ -500,6 +577,7 @@
         });
 
         function showPanel(title, details) {
+            // Keep Sidebar for persistent click details or fallback
             let html = `<h2>${title}</h2>`;
             for (const [key, value] of Object.entries(details)) {
                 if (value) {
@@ -629,7 +707,13 @@
                     hitBox.setAttribute("height", 50);
                     hitBox.setAttribute("fill", "transparent");
                     hitBox.setAttribute("cursor", "pointer");
-                    hitBox.onmouseover = () => showPanel(p.label, { "Type": "Actor", "Description": p.description });
+
+                    hitBox.onmouseover = (e) => {
+                        showPanel(p.label, { "Type": "Actor", "Description": p.description });
+                        showTooltip(p.label, "Actor Participant", p.description);
+                    };
+                    hitBox.onmouseout = hideTooltip;
+
                     svg.appendChild(hitBox);
 
                 } else {
@@ -641,7 +725,13 @@
                     rect.setAttribute("height", CONFIG.participantHeight);
                     rect.setAttribute("rx", 5);
                     rect.setAttribute("class", "participant-box");
-                    rect.onmouseover = () => showPanel(p.label, { "Type": p.type, "Description": p.description });
+
+                    rect.onmouseover = (e) => {
+                        showPanel(p.label, { "Type": p.type, "Description": p.description });
+                        showTooltip(p.label, (p.type || "Participant"), p.description);
+                    };
+                    rect.onmouseout = hideTooltip;
+
                     svg.appendChild(rect);
                 }
 
@@ -660,15 +750,12 @@
                 const cx = participantX[act.participant];
                 if (!cx) return;
 
-                // Simple height calculation based on steps
-                // We assume steps map linearly to Y positions
-                // Start Y = header + (startStep * msgHeight)
                 const startY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.startStep * CONFIG.messageHeight) - (CONFIG.messageHeight / 2);
                 const endY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.endStep * CONFIG.messageHeight) + (CONFIG.messageHeight / 2);
-                const height = Math.max(endY - startY, CONFIG.messageHeight); // Min height
+                const height = Math.max(endY - startY, CONFIG.messageHeight);
 
                 const rect = document.createElementNS(svgNS, "rect");
-                rect.setAttribute("x", cx - 5); // 10px wide bar
+                rect.setAttribute("x", cx - 5);
                 rect.setAttribute("y", startY);
                 rect.setAttribute("width", 10);
                 rect.setAttribute("height", height);
@@ -681,7 +768,7 @@
             let tempY = currentY;
             events.forEach(ev => {
                 tempY += CONFIG.messageHeight;
-                ev._y = tempY; // Store calculated Y
+                ev._y = tempY;
                 if (ev.step) stepY[ev.step] = tempY;
             });
 
@@ -691,7 +778,7 @@
                 const startStepY = stepY[frag.startStep] ? stepY[frag.startStep] - (CONFIG.messageHeight) : CONFIG.topMargin + CONFIG.participantHeight + 20;
                 const endStepY = stepY[frag.endStep] ? stepY[frag.endStep] + (CONFIG.messageHeight / 3) : totalHeight - 20;
 
-                const x = CONFIG.participantMargin / 2 - 20; // Start before first participant
+                const x = CONFIG.participantMargin / 2 - 20;
                 const width = totalWidth - CONFIG.participantMargin + 40;
                 const height = endStepY - startStepY;
 
@@ -707,7 +794,7 @@
                 rect.setAttribute("class", "fragment-box");
                 g.appendChild(rect);
 
-                // Label Box (top-left corner)
+                // Label Box 
                 const labelWidth = 60;
                 const labelHeight = 20;
                 const labelRect = document.createElementNS(svgNS, "path");
@@ -715,7 +802,7 @@
                 labelRect.setAttribute("class", "fragment-label-box");
                 g.appendChild(labelRect);
 
-                // Type Label (alt, loop)
+                // Type Label
                 const typeText = document.createElementNS(svgNS, "text");
                 typeText.setAttribute("x", x + 5);
                 typeText.setAttribute("y", startStepY + 14);
@@ -723,7 +810,7 @@
                 typeText.textContent = frag.type || "alt";
                 g.appendChild(typeText);
 
-                // Condition Label (if descriptive)
+                // Condition Label
                 if (frag.condition) {
                     const condText = document.createElementNS(svgNS, "text");
                     condText.setAttribute("x", x + 10 + labelWidth);
@@ -737,7 +824,7 @@
                 svg.appendChild(g);
             });
 
-            // Draw Events (Actually render them using pre-calculated Y)
+            // Draw Events and Self-Calls
             events.forEach(ev => {
                 const y = ev._y; // Use pre-calc Y
 
@@ -751,7 +838,6 @@
                             // SELF-CALL (Loop)
                             const loopWidth = 30;
                             const loopHeight = 20;
-                            // Path: Start at x1,y -> right -> down -> left
                             const pathD = `M ${x1} ${y} L ${x1 + loopWidth} ${y} L ${x1 + loopWidth} ${y + loopHeight} L ${x1} ${y + loopHeight}`;
 
                             const path = document.createElementNS(svgNS, "path");
@@ -761,19 +847,22 @@
                             const markerId = ev.arrowType === 'open_arrow' ? 'url(#arrowhead-open)' : 'url(#arrowhead)';
                             path.setAttribute("marker-end", markerId);
 
-                            path.onmouseover = () => showPanel("Internal Process", {
-                                "Participant": ev.source,
-                                "Action": ev.label
-                            });
+                            path.onmouseover = () => {
+                                showPanel("Internal Process", { "Participant": ev.source, "Action": ev.label });
+                                showTooltip(ev.label, "Self-Call (Internal)", `Process within ${ev.source}`);
+                            };
+                            path.onmouseout = hideTooltip;
+
                             svg.appendChild(path);
 
                             const text = document.createElementNS(svgNS, "text");
                             text.setAttribute("x", x1 + loopWidth + 10);
                             text.setAttribute("y", y + 15);
                             text.setAttribute("class", "message-text");
-                            text.style.textAnchor = "start"; // Align left of loop
+                            text.style.textAnchor = "start";
                             text.textContent = ev.label;
                             text.onmouseover = path.onmouseover;
+                            text.onmouseout = hideTooltip;
                             svg.appendChild(text);
 
                         } else {
@@ -788,11 +877,11 @@
                             line.setAttribute("marker-end", markerId);
 
                             // Hover event
-                            line.onmouseover = () => showPanel("Message Details", {
-                                "From": ev.source,
-                                "To": ev.target,
-                                "Message": ev.label
-                            });
+                            line.onmouseover = () => {
+                                showPanel("Message Details", { "From": ev.source, "To": ev.target, "Message": ev.label });
+                                showTooltip(ev.label, "Message Interaction", `From <b>${ev.source}</b> to <b>${ev.target}</b>`);
+                            };
+                            line.onmouseout = hideTooltip;
 
                             svg.appendChild(line);
 
@@ -802,6 +891,7 @@
                             text.setAttribute("class", "message-text");
                             text.textContent = ev.label;
                             text.onmouseover = line.onmouseover;
+                            text.onmouseout = hideTooltip;
                             svg.appendChild(text);
                         }
                     }
