@@ -2384,7 +2384,10 @@
 
                 let content = `<div class="tooltip-header">${nodeData.label}</div>`;
                 if (nodeData.type) content += `<div class="tooltip-type">Type: ${nodeData.type}</div>`;
-                if (nodeData.description) content += `<div class="tooltip-desc">${nodeData.description}</div>`;
+
+                // Prioritize hoverSummary for the tooltip
+                const tooltipText = nodeData.hoverSummary || nodeData.description;
+                if (tooltipText) content += `<div class="tooltip-desc">${tooltipText}</div>`;
 
                 const connections = node.connectedEdges().length;
                 content += `<div class="tooltip-connections">Connections: ${connections}</div>`;
