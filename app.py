@@ -207,10 +207,23 @@ def generate_graph(topic, api_key, graph_type="Graph"):
             return None, None, f"Exception: {str(e)}"
     return None, None, "Prompt template not found."
 
-def modify_graph(current_json, prompt, api_key):
+def load_mindmap_modification_prompt():
+    try:
+        with open("mindmap_modification_prompt.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        st.error("Error: mindmap_modification_prompt.txt not found.")
+        return None
+
+def modify_graph(current_json, prompt, api_key, graph_type="Graph"):
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
     
-    template = load_modification_prompt()
+    template = None
+    if graph_type == "Mindmap":
+        template = load_mindmap_modification_prompt()
+    else:
+        template = load_modification_prompt()
+
     if not template:
         return None, None, "Modification prompt file missing."
         
@@ -230,7 +243,14 @@ def modify_graph(current_json, prompt, api_key):
         
         new_json_data = json.loads(content)
         
-        html_template = load_html_template()
+        html_loader = load_html_template
+        if graph_type == "Sequence":
+            html_loader = load_sequence_template
+        elif graph_type == "Timeline":
+            html_loader = load_timeline_template
+            
+        html_template = html_loader()
+        
         if html_template:
             new_html = inject_data_into_html(html_template, new_json_data)
             return new_html, new_json_data, None
@@ -337,7 +357,7 @@ def main():
                 else:
                     # Modify Existing
                     with st.spinner("Modifying..."):
-                        new_html, json_data, error = modify_graph(target_json, prompt, api_key)
+                        new_html, json_data, error = modify_graph(target_json, prompt, api_key, graph_type)
                         if new_html:
                             st.session_state.html_content = new_html
                             st.session_state.current_json_data = json_data # Update state
