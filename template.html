@@ -853,6 +853,9 @@
             <div class="context-menu-item node-action" data-action="connect">
                 <span>🔗</span> Connect to...
             </div>
+            <div class="context-menu-item node-action" data-action="add-child">
+                <span>🌿</span> Add Child Node
+            </div>
             <div class="context-menu-item node-action" data-action="rename">
                 <span>✏️</span> Rename
             </div>
@@ -1572,6 +1575,9 @@
                     case 'connect':
                         this.startConnectionMode(node);
                         break;
+                    case 'add-child': // New Action
+                        this.promptAddChild(node);
+                        break;
                     case 'rename':
                         this.promptRenameNode({ nodeId: node.id(), currentLabel: node.data('label') });
                         break;
@@ -1640,6 +1646,79 @@
                 }
             }
 
+            promptAddChild(parentNode) {
+                const label = prompt("Enter Child Node Label:", "Child Node");
+                if (!label) return;
+
+                const description = prompt("Enter Description/Summary:", "A sub-topic.");
+
+                this.addChild(parentNode, {
+                    label: label,
+                    description: description
+                });
+            }
+
+            addChild(parentNode, childInfo) {
+                const parentId = parentNode.id();
+                const childId = 'node_' + Date.now();
+
+                // 1. Add Node to Data
+                const newNode = {
+                    id: childId,
+                    data: {
+                        label: childInfo.label,
+                        type: 'leaf', // Default to leaf, user can change later if needed
+                        description: childInfo.description,
+                        summary: childInfo.description,
+                        hoverSummary: childInfo.description // Default hover summary
+                    }
+                };
+                if (!this.architectureData.nodes) this.architectureData.nodes = [];
+                this.architectureData.nodes.push(newNode);
+
+                // 2. Add Edge to Data
+                const newEdge = {
+                    id: 'edge_' + Date.now(),
+                    source: parentId,
+                    target: childId,
+                    type: 'connects'
+                };
+                if (!this.architectureData.edges) this.architectureData.edges = [];
+                this.architectureData.edges.push(newEdge);
+
+                // 3. Update Hierarchy
+                if (!this.architectureData.hierarchy) this.architectureData.hierarchy = {};
+                if (!this.architectureData.hierarchy[parentId]) this.architectureData.hierarchy[parentId] = [];
+                this.architectureData.hierarchy[parentId].push(childId);
+
+                // 4. Add to Cytoscape
+                this.cy.add({
+                    group: 'nodes',
+                    data: newNode.data,
+                    position: { x: 0, y: 0 } // Layout will fix this
+                });
+
+                this.cy.add({
+                    group: 'edges',
+                    data: {
+                        id: newEdge.id,
+                        source: newEdge.source,
+                        target: newEdge.target
+                    }
+                });
+
+                // 5. Apply Layout
+                this.applyLayout();
+
+                // 6. Select New Node
+                setTimeout(() => {
+                    const addedNode = this.cy.getElementById(childId);
+                    if (addedNode && addedNode.length > 0) {
+                        this.handleNodeClick(addedNode);
+                    }
+                }, 100);
+            }
+
             promptRenameNode(detail) {
                 const nodeId = detail.nodeId || detail; // Handle object or string
                 const node = this.cy.getElementById(nodeId);
@@ -1656,6 +1735,7 @@
                     if (this.state.selectedNode && this.state.selectedNode.id() === nodeId) {
                         this.updateSidebar(node);
                     }
+                    this.applyLayout();
                 }
             }
 
@@ -1816,6 +1896,9 @@
                 if (this.state.selectedNode && this.state.selectedNode.id() === nodeId) {
                     this.clearSelection();
                 }
+
+                // Update layout to fill gaps
+                this.applyLayout();
             }
 
             updateNodeData(nodeId, updates) {
