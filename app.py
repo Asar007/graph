@@ -260,6 +260,103 @@ def modify_graph(current_json, prompt, api_key, graph_type="Graph"):
         
     return None, None, "Unknown error during modification."
 
+# --- Helper Functions for Simple Editor ---
+def json_to_dsl(json_data):
+    """Converts JSON graph data to Simple DSL Format."""
+    if not json_data:
+        return ""
+    
+    lines = []
+    # 1. Edges first (simplest to read)
+    if 'edges' in json_data:
+        for edge in json_data['edges']:
+            src = edge.get('source', '?')
+            tgt = edge.get('target', '?')
+            label = edge.get('label', '')
+            
+            line = f"{src} -> {tgt}"
+            if label:
+                line += f" : {label}"
+            lines.append(line)
+            
+    # 2. Nodes that might not be in edges (orphans)
+    if 'nodes' in json_data:
+        existing_nodes = set()
+        if 'edges' in json_data:
+            for edge in json_data['edges']:
+                existing_nodes.add(edge.get('source'))
+                existing_nodes.add(edge.get('target'))
+        
+        for node in json_data['nodes']:
+            node_id = node.get('id')
+            if node_id and node_id not in existing_nodes:
+                lines.append(node_id)
+                
+    return "\n".join(lines)
+
+def dsl_to_json(dsl_text, current_json=None):
+    """Converts Simple DSL text back to JSON structure, preserving formatting if possible."""
+    new_nodes = {} # Map id -> node_obj
+    new_edges = []
+    
+    # helper to ensure node exists
+    def get_or_create_node(node_id):
+        if node_id not in new_nodes:
+            # Try to preserve existing node data if available
+            existing_data = None
+            if current_json and 'nodes' in current_json:
+                existing_data = next((n for n in current_json['nodes'] if n['id'] == node_id), None)
+            
+            if existing_data:
+                new_nodes[node_id] = existing_data
+            else:
+                new_nodes[node_id] = {"id": node_id, "label": node_id}
+        return new_nodes[node_id]
+
+    lines = dsl_text.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        
+        # Parse Arrow "->"
+        if "->" in line:
+            parts = line.split("->")
+            source_id = parts[0].strip()
+            remainder = parts[1].strip()
+            
+            target_id = remainder
+            label = None
+            
+            # Parse Label ":"
+            if ":" in remainder:
+                r_parts = remainder.split(":")
+                target_id = r_parts[0].strip()
+                label = r_parts[1].strip()
+            
+            get_or_create_node(source_id)
+            get_or_create_node(target_id)
+            
+            edge_obj = {
+                "id": f"e-{source_id}-{target_id}-{len(new_edges)}",
+                "source": source_id,
+                "target": target_id
+            }
+            if label:
+                edge_obj["label"] = label
+            new_edges.append(edge_obj)
+            
+        else:
+            # Just a node
+            get_or_create_node(line)
+            
+    return {
+        "nodes": list(new_nodes.values()),
+        "edges": new_edges,
+        "hierarchy": {}, # Reset hierarchy for now as DSL doesn't easily capture it
+        "details": current_json.get('details', {}) if current_json else {}
+    }
+
+
 def main():
     # Initialize JSON data state to allow modifications
     if 'current_json_data' not in st.session_state:
@@ -369,14 +466,92 @@ def main():
     # --- Main Area ---
     st.title("Interactive Graph Generator")
     
-    # Render Graph
-    # Render Graph
     if st.session_state.html_content:
-        # Increased height from 850 to 1200 for a bigger view
-        st.components.v1.html(st.session_state.html_content, height=1200, scrolling=True)
-        
-        # Download button below graph
-        st.download_button("Download HTML", st.session_state.html_content, "graph.html", "text/html")
+        # Create two columns: Left for Editor, Right for Preview
+        col1, col2 = st.columns([1, 2]) 
+
+        with col1:
+            st.subheader("Live Editor")
+            if st.session_state.current_json_data:
+                
+                # Tabs for different editing modes
+                tab_simple, tab_json = st.tabs(["Simple Mode", "Advanced JSON"])
+                
+                with tab_simple:
+                    st.caption("Edit graph structure using `Node A -> Node B` syntax.")
+                    
+                    # 1. Convert Current JSON -> DSL for initial view
+                    # We use a key based on json hash or something to avoid loop? 
+                    # Simpler: Just regenerate DSL every time unless processed.
+                    # Buuut if user is typing, we don't want to overwrite their typing with json reload.
+                    # Streamlit handling:
+                    current_dsl = json_to_dsl(st.session_state.current_json_data)
+                    
+                    dsl_input = st.text_area(
+                        "Simple Graph Definition",
+                        value=current_dsl,
+                        height=750,
+                        key="dsl_input"
+                    )
+                    
+                    if dsl_input != current_dsl:
+                         # User Changed DSL -> Update JSON
+                         try:
+                             new_json_from_dsl = dsl_to_json(dsl_input, st.session_state.current_json_data)
+                             st.session_state.current_json_data = new_json_from_dsl
+                             
+                             # Update HTML
+                             html_loader = load_html_template # Default
+                             # (Type inference logic if needed)
+                             html_template = html_loader()
+                             if html_template:
+                                new_html = inject_data_into_html(html_template, new_json_from_dsl)
+                                st.session_state.html_content = new_html
+                                st.rerun()
+                         except Exception as e:
+                             st.error(f"Error parsing DSL: {e}")
+
+                with tab_json:
+                    # Convert current JSON to string for the text area
+                    json_str = json.dumps(st.session_state.current_json_data, indent=2)
+                    
+                    edited_json_str = st.text_area(
+                        "Edit JSON Data", 
+                        value=json_str, 
+                        height=750, 
+                        key="live_editor_area",
+                        help="Modify the JSON here and press Ctrl+Enter to update the graph."
+                    )
+
+                    if edited_json_str != json_str:
+                        try:
+                            new_json_data = json.loads(edited_json_str)
+                            st.session_state.current_json_data = new_json_data
+                            
+                            html_loader = load_html_template
+                            if "participants" in new_json_data and "events" in new_json_data:
+                                 html_loader = load_sequence_template
+                            elif "mermaid_syntax" in new_json_data:
+                                 html_loader = load_timeline_template
+                            
+                            html_template = html_loader()
+                            if html_template:
+                                new_html = inject_data_into_html(html_template, new_json_data)
+                                st.session_state.html_content = new_html
+                                st.rerun() 
+                                
+                        except json.JSONDecodeError as e:
+                            st.error(f"Invalid JSON: {e}")
+                        except Exception as e:
+                            st.error(f"Error updating graph: {e}")
+            else:
+                 st.info("Generate a graph to see the editor.")
+
+        with col2:
+            st.subheader("Preview")
+            st.components.v1.html(st.session_state.html_content, height=1200, scrolling=True)
+            st.download_button("Download HTML", st.session_state.html_content, "graph.html", "text/html")
+
 
 
 if __name__ == "__main__":
