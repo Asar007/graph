@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 import time
 import difflib
-
+from streamlit_ace import st_ace
 
 # Load environment variables
 load_dotenv(override=True)
@@ -528,17 +528,15 @@ def sequence_dsl_to_json(dsl_text):
                 "condition": cond, 
                 "startStep": current_step
             })
+            current_step += 1 # Ensure content starts on next line
             continue
         
         if line == 'end':
             if fragment_stack:
                 frag = fragment_stack.pop()
                 frag['endStep'] = current_step
-                # If no events happened, endStep might be same as start. 
-                # Ensure range covers at least the current step if events occurred?
-                # Actually, endStep should probably be the step of the *last event* in block?
-                # Let's say endStep is current_step.
                 fragments.append(frag)
+                current_step += 1 # Ensure subsequent content starts on next line
             continue
             
         # 3. Activations
@@ -546,7 +544,19 @@ def sequence_dsl_to_json(dsl_text):
             p_id = line.split(' ')[1].strip()
             # Ensure participant exists
             p_id = get_or_create_participant(p_id)
-            activation_stack[p_id] = current_step
+            
+            # Backdate logic: If the LAST event was a message TO this participant
+            # and it happened at the previous step, assume this activation belongs to it.
+            start_step_candidate = current_step
+            if events:
+                 last_evt = events[-1]
+                 # events are {step, source, target...}
+                 # Check if last event target is this participant AND it was one step ago
+                 # (Since we increment current_step after adding event)
+                 if last_evt['target'] == p_id and last_evt['step'] == current_step - 1:
+                     start_step_candidate = current_step - 1
+            
+            activation_stack[p_id] = start_step_candidate
             continue
             
         if line.startswith('deactivate '):
@@ -840,6 +850,153 @@ def generate_json_from_dsl(dsl_text, api_key, graph_type="Sequence"):
         raise Exception(f"Gemini Conversion Failed: {str(e)}")
 
 
+def render_live_editor(graph_type, api_key):
+    st.subheader("Live Editor")
+    if st.session_state.current_json_data:
+        
+        # Tabs for different editing modes
+        tab_simple, tab_json = st.tabs(["Simple Mode", "Advanced JSON"])
+        
+        with tab_simple:
+            is_sequence = (graph_type == "Sequence")
+            st.caption("Edit structure using Simple DSL.")
+            if is_sequence:
+                st.info(
+                    """
+                    **Sequence Syntax Guide:**
+                    - **Sync Message:** `A -> B : Message` (Solid Line)
+                    - **Async Message:** `A ->> B : Message` (Open Arrow)
+                    - **Return Message:** `A --> B : Reply` (Dotted Line)
+                    - **Self Message:** `A -> A : Internal process`
+                    - **Alternative Flow:**
+                      ```
+                      alt Invalid Token
+                        A --> B : 401 Error
+                      end
+                      ```
+                    - **Activations:** `activate A` / `deactivate A`
+                    """
+                )
+            else:
+                st.info("💡 **Syntax:** `Node A -> Node B : Label`")
+            
+            # 1. Convert Current JSON -> DSL for initial view
+            current_dsl = ""
+            try:
+                if is_sequence:
+                    current_dsl = sequence_json_to_dsl(st.session_state.current_json_data)
+                else:
+                    current_dsl = json_to_dsl(st.session_state.current_json_data)
+            except Exception:
+                current_dsl = ""
+            
+            # Dynamic key to prevent state cross-talk between modes
+            text_area_key = f"dsl_input_{graph_type}"
+            
+            st.caption("Simple Definition (Auto-updates)")
+            dsl_input = st_ace(
+                value=current_dsl,
+                language='markdown',
+                theme='monokai', # Nice dark theme
+                height=750,
+                key=text_area_key,
+                auto_update=True, # Attempt instant updates
+                show_gutter=True, # Line numbers!
+                wrap=True
+            )
+            
+            # Trigger update if input differs from the canonical DSL of the current JSON
+            if dsl_input != current_dsl:
+                # User Changed DSL -> Update JSON
+                try:
+                    new_json_from_dsl = None
+                    if is_sequence:
+                        new_json_from_dsl = sequence_dsl_to_json(dsl_input)
+                    else:
+                        new_json_from_dsl = dsl_to_json(dsl_input, st.session_state.current_json_data)
+                    
+                    if new_json_from_dsl and new_json_from_dsl != st.session_state.current_json_data:
+                        st.session_state.current_json_data = new_json_from_dsl
+                        # Update HTML
+                        if graph_type == "Sequence":
+                             html_loader = load_sequence_template
+                        elif graph_type == "Timeline":
+                             html_loader = load_timeline_template
+                        else:
+                             html_loader = load_html_template
+                        
+                        html_template = html_loader()
+                        if html_template:
+                            new_html = inject_data_into_html(html_template, new_json_from_dsl)
+                            st.session_state.html_content = new_html
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"Error parsing DSL: {e}")
+
+            # Add an AI "Magic Fix" button for complex requests or if user wants LLM help
+            if is_sequence:
+                if st.button("✨ AI Magic Fix / Regenerate", help="Use AI to rewrite the diagram based on your text (Slower but understands natural language)."):
+                    if not api_key:
+                        st.error("API Key required.")
+                    else:
+                        with st.spinner("🤖 Gemini is rewriting..."):
+                            try:
+                                # Use the robust generate function
+                                ai_json = generate_json_from_dsl(dsl_input, api_key, "Sequence")
+                                if ai_json and ai_json != st.session_state.current_json_data:
+                                    st.session_state.current_json_data = ai_json
+                                    # Update HTML
+                                    html_template = load_sequence_template()
+                                    if html_template:
+                                        new_html = inject_data_into_html(html_template, ai_json)
+                                        st.session_state.html_content = new_html
+                                        st.rerun()
+                            except Exception as e:
+                                st.error(f"AI Generation Failed: {e}")
+
+        with tab_json:
+            # Convert current JSON to string for the text area
+            json_str = json.dumps(st.session_state.current_json_data, indent=2)
+            
+            st.caption("Edit JSON Data (Press Ctrl+Enter to apply)")
+            edited_json_str = st_ace(
+                value=json_str, 
+                language='json',
+                theme='monokai',
+                height=750, 
+                key="live_editor_area",
+                auto_update=False,
+                show_gutter=True,
+                wrap=True
+            )
+
+            if edited_json_str != json_str:
+                try:
+                    new_json_data = json.loads(edited_json_str)
+                    
+                    # Only update if semantically different
+                    if new_json_data != st.session_state.current_json_data:
+                        st.session_state.current_json_data = new_json_data
+                        
+                        html_loader = load_html_template
+                        if "participants" in new_json_data and "events" in new_json_data:
+                             html_loader = load_sequence_template
+                        elif "mermaid_syntax" in new_json_data:
+                             html_loader = load_timeline_template
+                        
+                        html_template = html_loader()
+                        if html_template:
+                            new_html = inject_data_into_html(html_template, new_json_data)
+                            st.session_state.html_content = new_html
+                            st.rerun() 
+                        
+                except json.JSONDecodeError as e:
+                    st.error(f"Invalid JSON: {e}")
+                except Exception as e:
+                    st.error(f"Error updating graph: {e}")
+    else:
+        st.info("Generate a graph to see the editor.")
+
 def main():
     # Initialize JSON data state to allow modifications
     if 'current_json_data' not in st.session_state:
@@ -950,152 +1107,18 @@ def main():
     st.title("Interactive Graph Generator")
     
     if st.session_state.html_content:
-        # Create two columns: Left for Editor, Right for Preview
-        col1, col2 = st.columns([1, 2]) 
+        # Create layout based on user preference
+        show_editor = st.toggle("Show Live Code Editor", value=True)
+        
+        if show_editor:
+            col1, col2 = st.columns([1, 2]) 
+        else:
+            col1 = None # Editor hidden
+            col2 = st.container() # Full width for preview
 
-        with col1:
-            st.subheader("Live Editor")
-            if st.session_state.current_json_data:
-                
-                # Tabs for different editing modes
-                tab_simple, tab_json = st.tabs(["Simple Mode", "Advanced JSON"])
-                
-                with tab_simple:
-                    is_sequence = (graph_type == "Sequence")
-                    st.caption("Edit structure using Simple DSL.")
-                    if is_sequence:
-                        st.info(
-                            """
-                            **Sequence Syntax Guide:**
-                            - **Sync Message:** `A -> B : Message` (Solid Line)
-                            - **Async Message:** `A ->> B : Message` (Open Arrow)
-                            - **Return Message:** `A --> B : Reply` (Dotted Line)
-                            - **Self Message:** `A -> A : Internal process`
-                            - **Alternative Flow:**
-                              ```
-                              alt Invalid Token
-                                A --> B : 401 Error
-                              end
-                              ```
-                            - **Activations:** `activate A` / `deactivate A`
-                            """
-                        )
-                    else:
-                        st.info("💡 **Syntax:** `Node A -> Node B : Label`")
-                    
-                    # 1. Convert Current JSON -> DSL for initial view
-                    current_dsl = ""
-                    # Use a try-catch for safety during conversion
-                    try:
-                        if is_sequence:
-                             current_dsl = sequence_json_to_dsl(st.session_state.current_json_data)
-                        else:
-                             current_dsl = json_to_dsl(st.session_state.current_json_data)
-                    except Exception:
-                        current_dsl = ""
-                    
-                    # Dynamic key to prevent state cross-talk between modes
-                    text_area_key = f"dsl_input_{graph_type}"
-                    
-                    dsl_input = st.text_area(
-                        "Simple Definition",
-                        value=current_dsl,
-                        height=750,
-                        key=text_area_key,
-                        help="Changes here will be processed by Gemini for Sequence Diagrams (Slower but Smarter)." if is_sequence else "Changes update instantly."
-                    )
-                    
-                     # Trigger update if input differs from the canonical DSL of the current JSON
-                    if dsl_input != current_dsl:
-                         # User Changed DSL -> Update JSON
-                         try:
-                             new_json_from_dsl = None
-                             if is_sequence:
-                                 # 1. Try Local Parse
-                                 new_json_from_dsl = sequence_dsl_to_json(dsl_input)
-                             else:
-                                 # For standard graphs, pass current_data to preserve metadata
-                                 new_json_from_dsl = dsl_to_json(dsl_input, st.session_state.current_json_data)
-                             
-                             # CRITICAL FIX: Only update if the logic actually changed the data structure
-                             # This prevents infinite loops where formatting differences (spaces etc) cause reruns.
-                             if new_json_from_dsl and new_json_from_dsl != st.session_state.current_json_data:
-                                st.session_state.current_json_data = new_json_from_dsl
-                                # Update HTML
-                                if graph_type == "Sequence":
-                                     html_loader = load_sequence_template
-                                elif graph_type == "Timeline":
-                                     html_loader = load_timeline_template
-                                else:
-                                     html_loader = load_html_template
-                                
-                                html_template = html_loader()
-                                if html_template:
-                                    new_html = inject_data_into_html(html_template, new_json_from_dsl)
-                                    st.session_state.html_content = new_html
-                                    st.rerun()
-                         except Exception as e:
-                             st.error(f"Error parsing DSL: {e}")
-
-                    # Add an AI "Magic Fix" button for complex requests or if user wants LLM help
-                    if is_sequence:
-                        if st.button("✨ AI Magic Fix / Regenerate", help="Use AI to rewrite the diagram based on your text (Slower but understands natural language)."):
-                            if not api_key:
-                                st.error("API Key required.")
-                            else:
-                                with st.spinner("🤖 Gemini is rewriting..."):
-                                    try:
-                                        # Use the robust generate function
-                                        ai_json = generate_json_from_dsl(dsl_input, api_key, "Sequence")
-                                        if ai_json and ai_json != st.session_state.current_json_data:
-                                            st.session_state.current_json_data = ai_json
-                                            # Update HTML
-                                            html_template = load_sequence_template()
-                                            if html_template:
-                                                new_html = inject_data_into_html(html_template, ai_json)
-                                                st.session_state.html_content = new_html
-                                                st.rerun()
-                                    except Exception as e:
-                                        st.error(f"AI Generation Failed: {e}")
-
-                with tab_json:
-                    # Convert current JSON to string for the text area
-                    json_str = json.dumps(st.session_state.current_json_data, indent=2)
-                    
-                    edited_json_str = st.text_area(
-                        "Edit JSON Data", 
-                        value=json_str, 
-                        height=750, 
-                        key="live_editor_area",
-                        help="Modify the JSON here and press Ctrl+Enter to update the graph."
-                    )
-
-                    if edited_json_str != json_str:
-                        try:
-                            new_json_data = json.loads(edited_json_str)
-                            
-                            # Only update if semantically different
-                            if new_json_data != st.session_state.current_json_data:
-                                st.session_state.current_json_data = new_json_data
-                                
-                                html_loader = load_html_template
-                                if "participants" in new_json_data and "events" in new_json_data:
-                                     html_loader = load_sequence_template
-                                elif "mermaid_syntax" in new_json_data:
-                                     html_loader = load_timeline_template
-                                
-                                html_template = html_loader()
-                                if html_template:
-                                    new_html = inject_data_into_html(html_template, new_json_data)
-                                    st.session_state.html_content = new_html
-                                    st.rerun() 
-                                
-                        except json.JSONDecodeError as e:
-                            st.error(f"Invalid JSON: {e}")
-                        except Exception as e:
-                            st.error(f"Error updating graph: {e}")
-            else:
-                 st.info("Generate a graph to see the editor.")
+        if show_editor and col1:
+            with col1:
+                render_live_editor(graph_type, api_key)
 
         with col2:
             st.subheader("Preview")

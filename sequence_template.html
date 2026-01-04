@@ -616,8 +616,21 @@
 
             const totalWidth = currentX;
             const events = data.events || [];
+            const fragments = data.fragments || [];
+            const activations = data.activations || [];
+
+            // Calculate Max Step to determine height
+            let maxStep = 0;
+            events.forEach(e => maxStep = Math.max(maxStep, e.step || 0));
+            fragments.forEach(f => maxStep = Math.max(maxStep, f.endStep || 0));
+            activations.forEach(a => maxStep = Math.max(maxStep, a.endStep || 0));
+
+            // Ensure at least some height
+            maxStep = Math.max(maxStep, 1);
+
             let currentY = CONFIG.topMargin + CONFIG.participantHeight + 40;
-            let totalHeight = currentY + (events.length * CONFIG.messageHeight) + 100;
+            // Height = Base + (Steps * HeightPerStep) + BottomPadding
+            let totalHeight = currentY + (maxStep * CONFIG.messageHeight) + 100;
 
             const svgNS = "http://www.w3.org/2000/svg";
             const svg = document.createElementNS(svgNS, "svg");
@@ -744,14 +757,18 @@
                 svg.appendChild(text);
             });
 
+            // Base Y for all step calculations
+            const gridStartY = CONFIG.topMargin + CONFIG.participantHeight + 40;
+
             // Draw Activations
-            const activations = data.activations || [];
+            // Draw Activations
+            // activations already defined above
             activations.forEach(act => {
                 const cx = participantX[act.participant];
                 if (!cx) return;
 
-                const startY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.startStep * CONFIG.messageHeight) - (CONFIG.messageHeight / 2);
-                const endY = CONFIG.topMargin + CONFIG.participantHeight + 40 + (act.endStep * CONFIG.messageHeight) + (CONFIG.messageHeight / 2);
+                const startY = gridStartY + (act.startStep * CONFIG.messageHeight) - (CONFIG.messageHeight / 2);
+                const endY = gridStartY + (act.endStep * CONFIG.messageHeight) + (CONFIG.messageHeight / 2);
                 const height = Math.max(endY - startY, CONFIG.messageHeight);
 
                 const rect = document.createElementNS(svgNS, "rect");
@@ -763,24 +780,17 @@
                 svg.appendChild(rect);
             });
 
-            // PRE-CALCULATE STEP POSITIONS FOR FRAGMENTS
-            const stepY = {};
-            let tempY = currentY;
-            events.forEach(ev => {
-                tempY += CONFIG.messageHeight;
-                ev._y = tempY;
-                if (ev.step) stepY[ev.step] = tempY;
-            });
-
-            // Draw Fragments (Behind events)
-            const fragments = data.fragments || [];
+            // Draw Fragments
+            // Draw Fragments
+            // fragments already defined above
             fragments.forEach(frag => {
-                const startStepY = stepY[frag.startStep] ? stepY[frag.startStep] - (CONFIG.messageHeight) : CONFIG.topMargin + CONFIG.participantHeight + 20;
-                const endStepY = stepY[frag.endStep] ? stepY[frag.endStep] + (CONFIG.messageHeight / 3) : totalHeight - 20;
+                // Calculate Y based on step grid
+                const startStepY = gridStartY + (frag.startStep * CONFIG.messageHeight) - CONFIG.messageHeight;
+                const endStepY = gridStartY + (frag.endStep * CONFIG.messageHeight);
 
                 const x = CONFIG.participantMargin / 2 - 20;
                 const width = totalWidth - CONFIG.participantMargin + 40;
-                const height = endStepY - startStepY;
+                const height = Math.max(endStepY - startStepY, CONFIG.messageHeight);
 
                 // Group for fragment
                 const g = document.createElementNS(svgNS, "g");
@@ -826,7 +836,7 @@
 
             // Draw Events and Self-Calls
             events.forEach(ev => {
-                const y = ev._y; // Use pre-calc Y
+                const y = gridStartY + (ev.step * CONFIG.messageHeight); // Dynamic Y
 
                 if (ev.type === "message") {
                     const x1 = participantX[ev.source];
