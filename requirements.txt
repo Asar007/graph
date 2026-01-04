@@ -1,6 +1,7 @@
 streamlit
 google-generativeai
 python-dotenv
-
+streamlit-ace
 langchain
 langchain-google-genai
+
