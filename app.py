@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
+import time
+import difflib
+
 
 # Load environment variables
 load_dotenv(override=True)
@@ -192,7 +195,8 @@ def generate_graph(topic, api_key, graph_type="Graph"):
     if prompt_template:
         final_prompt = prompt_template.replace("[INSERT TOPIC HERE]", topic)
         try:
-            response = model.generate_content(final_prompt)
+            # Upsert reliability logic even for the older model
+            response = call_gemini_with_retry(model, final_prompt)
             json_data = validate_json(response.text)
             if json_data:
                 html_template = html_loader()
@@ -216,7 +220,9 @@ def load_mindmap_modification_prompt():
         return None
 
 def modify_graph(current_json, prompt, api_key, graph_type="Graph"):
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
+    genai.configure(api_key=api_key)
+    # Using the user's preferred model, but now wrapped in retry logic
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     template = None
     if graph_type == "Mindmap":
@@ -232,16 +238,12 @@ def modify_graph(current_json, prompt, api_key, graph_type="Graph"):
     final_prompt = final_prompt.replace("[INSERT CHANGE REQUEST HERE]", prompt)
     
     try:
-        messages = [
-            HumanMessage(content=final_prompt)
-        ]
+        # Robust execution
+        response = call_gemini_with_retry(model, final_prompt)
+        new_json_data = clean_json_output(response.text)
         
-        response = llm.invoke(messages)
-        content = response.content
-        content = re.sub(r'```json\s*', '', content)
-        content = re.sub(r'```\s*$', '', content)
-        
-        new_json_data = json.loads(content)
+        if not new_json_data:
+             return None, None, "Failed to parse JSON from AI response."
         
         html_loader = load_html_template
         if graph_type == "Sequence":
@@ -355,6 +357,487 @@ def dsl_to_json(dsl_text, current_json=None):
         "hierarchy": {}, # Reset hierarchy for now as DSL doesn't easily capture it
         "details": current_json.get('details', {}) if current_json else {}
     }
+
+# --- Sequence DSL Helpers ---
+
+def sequence_json_to_dsl(json_data):
+    """Converts Sequence JSON to Mermaid-like DSL."""
+    if not json_data: return ""
+    lines = []
+    
+    # 1. Participants
+    if 'participants' in json_data:
+        for p in json_data['participants']:
+            p_type = p.get('type', 'Participant')
+            p_id = p.get('id')
+            p_label = p.get('label', p_id)
+            if p_type == 'Actor':
+                lines.append(f"actor {p_label} as {p_id}")
+            else:
+                lines.append(f"participant {p_label} as {p_id}")
+    
+    lines.append("") # Spacer
+    
+    # 2. Events & Fragments mixed by step
+    # We need to reconstruct the flow. 
+    # Events have 'step'. Fragments have 'startStep' and 'endStep'.
+    # Activations have 'startStep' and 'endStep'.
+    
+    events = sorted(json_data.get('events', []), key=lambda x: x.get('step', 0))
+    fragments = json_data.get('fragments', [])
+    activations = json_data.get('activations', [])
+    
+    # Map steps to actions
+    max_step = 0
+    if events: max_step = max(e.get('step', 0) for e in events)
+    
+    # Create a map of what happens at each step
+    # This is tricky because fragments span steps.
+    # Simplified approach: Iterate steps 1 to N.
+    
+    # Pre-process fragments starting/ending
+    frag_starts = {} # step -> list of frags
+    frag_ends = {}   # step -> list of frags
+    for f in fragments:
+        s = f.get('startStep')
+        e = f.get('endStep')
+        if s: frag_starts.setdefault(s, []).append(f)
+        if e: frag_ends.setdefault(e, []).append(f)
+        max_step = max(max_step, e or 0)
+
+    # Pre-process activations
+    act_starts = {}
+    act_ends = {}
+    for a in activations:
+        s = a.get('startStep')
+        e = a.get('endStep')
+        if s: act_starts.setdefault(s, []).append(a)
+        if e: act_ends.setdefault(e, []).append(a)
+        max_step = max(max_step, e or 0)
+        
+    indent_level = 0
+    indent_str = "  "
+    
+    for step in range(1, max_step + 2):
+        # Check Fragment Starts
+        if step in frag_starts:
+            for f in frag_starts[step]:
+                lines.append(f"{indent_str * indent_level}alt {f.get('condition', '')}")
+                indent_level += 1
+        
+        # Check Events at this step
+        step_events = [e for e in events if e.get('step') == step]
+        for e in step_events:
+            src = e.get('source')
+            tgt = e.get('target')
+            lbl = e.get('label')
+            l_type = e.get('lineType', 'solid')
+            a_type = e.get('arrowType', 'solid')
+            
+            arrow = "->"
+            if l_type == 'dotted':
+                arrow = "-->"
+            elif a_type == 'open_arrow': # Async usually solid line open arrow
+                 arrow = "->>"
+            
+            lines.append(f"{indent_str * indent_level}{src} {arrow} {tgt} : {lbl}")
+            
+        # Check Activation Starts (after event usually)
+        if step in act_starts:
+            for a in act_starts[step]:
+                lines.append(f"{indent_str * indent_level}activate {a.get('participant')}")
+                
+        # Check Activation Ends
+        if step in act_ends:
+            for a in act_ends[step]:
+                lines.append(f"{indent_str * indent_level}deactivate {a.get('participant')}")
+
+        # Check Fragment Ends
+        if step in frag_ends:
+            for f in frag_ends[step]:
+                indent_level = max(0, indent_level - 1)
+                lines.append(f"{indent_str * indent_level}end")
+                
+    return "\n".join(lines)
+
+def sequence_dsl_to_json(dsl_text):
+    """Parses Mermaid-like Sequence DSL to JSON."""
+    lines = dsl_text.split('\n')
+    
+    participants = []
+    participant_ids = set()
+    events = []
+    activations = []
+    fragments = []
+    
+    fragment_stack = [] # Stack of {type, startStep, condition}
+    activation_stack = {} # map participant_id -> startStep
+    
+    current_step = 1
+    
+    def get_or_create_participant(name_or_id, label=None, p_type="Participant"):
+        p_id = name_or_id.replace(" ", "_") # Simple ID sanitization
+        if label:
+            display_label = label
+            final_id = p_id # definition uses ID
+        else:
+            # Usage like A -> B. ID is A. Label is A.
+            display_label = name_or_id
+            final_id = p_id
+            
+        if final_id not in participant_ids:
+            participant_ids.add(final_id)
+            participants.append({
+                "id": final_id,
+                "label": display_label,
+                "type": p_type,
+                "description": ""
+            })
+        return final_id
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        
+        # 1. Definitions
+        # participant Label as ID
+        # actor Label as ID
+        if line.startswith('participant ') or line.startswith('actor '):
+            parts = line.split(' ')
+            p_type = "Actor" if parts[0] == 'actor' else "Participant"
+            
+            # handle "as"
+            if " as " in line:
+                # participant "My API" as api
+                # regex might be better but let's do simple split
+                segments = line.split(" as ")
+                name_part = segments[0].replace(parts[0] + " ", "").strip().replace('"', '')
+                id_part = segments[1].strip()
+                get_or_create_participant(id_part, label=name_part, p_type=p_type)
+            else:
+                # participant User
+                name = line.replace(parts[0] + " ", "").strip().replace('"', '')
+                get_or_create_participant(name, label=name, p_type=p_type)
+            continue
+            
+        # 2. Fragments
+        if line.startswith('alt '):
+            cond = line[4:].strip()
+            fragment_stack.append({
+                "type": "alt", 
+                "condition": cond, 
+                "startStep": current_step
+            })
+            continue
+        
+        if line == 'end':
+            if fragment_stack:
+                frag = fragment_stack.pop()
+                frag['endStep'] = current_step
+                # If no events happened, endStep might be same as start. 
+                # Ensure range covers at least the current step if events occurred?
+                # Actually, endStep should probably be the step of the *last event* in block?
+                # Let's say endStep is current_step.
+                fragments.append(frag)
+            continue
+            
+        # 3. Activations
+        if line.startswith('activate '):
+            p_id = line.split(' ')[1].strip()
+            # Ensure participant exists
+            p_id = get_or_create_participant(p_id)
+            activation_stack[p_id] = current_step
+            continue
+            
+        if line.startswith('deactivate '):
+            p_id = line.split(' ')[1].strip()
+            p_id = get_or_create_participant(p_id)
+            if p_id in activation_stack:
+                start_s = activation_stack.pop(p_id)
+                activations.append({
+                    "participant": p_id,
+                    "startStep": start_s,
+                    "endStep": current_step 
+                })
+            continue
+
+        # 4. Messages
+        # A -> B : Label
+        # A --> B : Label
+        # A ->> B : Label
+        arrow_map = {
+            "->>": ("open_arrow", "solid"), # Async
+            "-->": ("open_arrow", "dotted"), # Return
+            "->": ("solid", "solid")      # Sync
+        }
+        
+        matched_arrow = None
+        for arrow, props in arrow_map.items():
+            if arrow in line:
+                # Check for longer matches first (--> before ->)
+                # But dict order isn't guaranteed.
+                # Actually "-->" contains "->", so we must be careful.
+                # Regex is safer.
+                pass
+
+        # Simple parsing logic relies on finding the split point
+        # Check "-->" first, then "->>", then "->"
+        
+        parts = None
+        arrow_type = "solid"
+        line_type = "solid"
+        
+        if "-->" in line:
+            parts = line.split("-->")
+            arrow_type, line_type = "open_arrow", "dotted"
+        elif "->>" in line:
+             parts = line.split("->>")
+             arrow_type, line_type = "open_arrow", "solid"
+        elif "->" in line:
+             parts = line.split("->")
+             arrow_type, line_type = "solid", "solid"
+             
+        if parts:
+            src = parts[0].strip()
+            remainder = parts[1].strip()
+            tgt = remainder
+            label = ""
+            
+            if ":" in remainder:
+                r_parts = remainder.split(":", 1)
+                tgt = r_parts[0].strip()
+                label = r_parts[1].strip()
+            
+            src_id = get_or_create_participant(src)
+            tgt_id = get_or_create_participant(tgt)
+            
+            # --- IMPLICIT ACTIVATION LOGIC ---
+            # Rule 1: A -> B (Sync Call) implies Activate B
+            if arrow_type == "solid" and line_type == "solid":
+                # Check if B is already active (explicitly or implicitly)
+                if tgt_id not in activation_stack:
+                    # Start implicit activation
+                    activation_stack[tgt_id] = current_step
+                    # We mark it as 'implicit' in a separate set if we wanted to be strict,
+                    # but for now, treating it same as explicit is fine.
+            
+            # Rule 2: B --> A (Return) implies Deactivate B
+            if arrow_type == "open_arrow" and line_type == "dotted":
+                # Check if B is active
+                if src_id in activation_stack:
+                     start_s = activation_stack.pop(src_id)
+                     activations.append({
+                        "participant": src_id,
+                        "startStep": start_s,
+                        "endStep": current_step
+                     })
+
+            events.append({
+                "step": current_step,
+                "type": "message",
+                "source": src_id,
+                "target": tgt_id,
+                "label": label,
+                "arrowType": arrow_type,
+                "lineType": line_type
+            })
+            
+            current_step += 1 # Increment step after event
+
+    return {
+        "participants": participants,
+        "events": events,
+        "activations": activations,
+        "fragments": fragments,
+        "metadata": {"title": "Sequence Diagram", "summary": "Generated via DSL"}
+    }
+def clean_json_output(text):
+    """Extracts JSON from text, handling markdown blocks."""
+    try:
+        # regex for ```json ... ```
+        match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if match:
+            text = match.group(1)
+        else:
+            # fallback to first brace pair
+            match = re.search(r'\{.*\}', text, re.DOTALL)
+            if match:
+                text = match.group(0)
+        return json.loads(text)
+    except Exception:
+        return None
+
+def call_gemini_with_retry(model, prompt, max_retries=5, retry_delay=5):
+    """Executes a Gemini generation with robust rate-limit handling."""
+    for attempt in range(max_retries):
+        try:
+            return model.generate_content(prompt)
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str and attempt < max_retries - 1:
+                # rate limit hit
+                wait_time = retry_delay
+                # Try to extract wait time from error message
+                match = re.search(r'retry in (\d+(\.\d+)?)s', error_str)
+                if match:
+                    wait_time = float(match.group(1)) + 1 # Add buffer
+                
+                # Use max of calculated backoff or requested wait
+                actual_wait = max(wait_time, retry_delay)
+                time.sleep(actual_wait)
+                
+                retry_delay *= 2 # Exponential backoff
+                continue
+            else:
+                raise e
+    raise Exception("Max retries reached")
+
+def generate_event_from_line(line_text, api_key):
+    """Uses LLM to parse a single DSL line into a JSON event object."""
+    # Tiny prompt for fast, cheap execution
+    prompt = f"""
+    Parse to JSON event object (source, target, label, arrowType, lineType):
+    "{line_text}"
+    
+    schema: {{"type": "message", "source": "id", "target": "id", "label": "str", "arrowType": "solid|open_arrow", "lineType": "solid|dotted"}}
+    """
+    genai.configure(api_key=api_key)
+    # Switch to stable model for reliability
+    model = genai.GenerativeModel('gemini-2.5-flash') 
+    try:
+        # Use retry logic here too!
+        resp = call_gemini_with_retry(model, prompt)
+        return clean_json_output(resp.text)
+    except:
+        return None
+
+def apply_smart_patch(old_dsl, new_dsl, current_json, api_key):
+    """
+    Attempts to update current_json based on a small diff.
+    Returns new_json if successful, or None if full regen is needed.
+    """
+    if not old_dsl or not current_json: return None
+    
+    old_lines = old_dsl.splitlines()
+    new_lines = new_dsl.splitlines()
+    
+    # We only handle 1:1 modifications for now (same line count)
+    if len(old_lines) != len(new_lines):
+        return None
+        
+    diff = list(difflib.ndiff(old_lines, new_lines))
+    
+    # Analyze diff to find the changed index
+    # ndiff produces lines starting with "- ", "+ ", "  "
+    # If we see exactly one "-" and one "+" at the same relative position, it's a mod.
+    
+    changes = [d for d in diff if d.startswith("- ") or d.startswith("+ ")]
+    if len(changes) != 2: return None # Too complex or no changes
+    
+    if not (changes[0].startswith("- ") and changes[1].startswith("+ ")):
+        return None # Not a simple swap
+        
+    # Find the index
+    changed_index = -1
+    for i, (o, n) in enumerate(zip(old_lines, new_lines)):
+        if o != n:
+            changed_index = i
+            break
+            
+    if changed_index == -1: return None
+    
+    new_line = new_lines[changed_index].strip()
+    
+    # IGNORE structural lines for patching (alt, loop, end, activate)
+    # We only patch messages: "A -> B: msg"
+    if any(x in new_line.lower() for x in ["alt ", "loop ", "opt ", "end", "activate ", "deactivate ", "participant ", "actor "]):
+        return None 
+        
+    # Calculate which "Event" this corresponds to
+    # We need to count how many "message" lines were above this line in the OLD DSL
+    event_index = 0
+    for i in range(changed_index):
+        l = old_lines[i].strip()
+        # Count if it looks like a message
+        if "->" in l:
+            event_index += 1
+            
+    # Check bounds
+    if event_index >= len(current_json.get('events', [])):
+        return None
+        
+    # Generate the new event object
+    new_event = generate_event_from_line(new_line, api_key)
+    if not new_event: return None
+    
+    # Update in place
+    import copy
+    new_data = copy.deepcopy(current_json)
+    
+    # Must preserve the 'step' of the old event to keep ordering valid
+    old_event = new_data['events'][event_index]
+    new_event['step'] = old_event.get('step', 1)
+    
+    new_data['events'][event_index] = new_event
+    
+    # Update title/metadata to show it was patched
+    new_data['metadata']['summary'] = "Patched via Smart Edit"
+    
+    return new_data
+
+def generate_json_from_dsl(dsl_text, api_key, graph_type="Sequence"):
+    """Uses Gemini to convert DSL text into valid Graph JSON."""
+    if not dsl_text.strip(): return None
+    
+    system_instruction = f"""
+    You are an expert software architect. 
+    Convert the following "{graph_type}" description (DSL) into a VALID JSON object adhering strictly to the schema.
+    
+    Input DSL:
+    {dsl_text}
+    """
+    
+    # OPTIMIZATION: Use a condensed schema instead of the full prompt file to save tokens.
+    minified_schema = """
+    {
+      "participants": [
+        {"id": "str", "label": "str", "type": "Actor|Participant", "description": "str"}
+      ],
+      "events": [
+        {"step": 1, "type": "message", "source": "id", "target": "id", "label": "str", "arrowType": "solid|open_arrow", "lineType": "solid|dotted"}
+      ],
+      "activations": [{"participant": "id", "startStep": int, "endStep": int}],
+      "fragments": [{"type": "alt", "condition": "str", "startStep": int, "endStep": int}]
+    }
+    """
+        
+    final_prompt = f"""
+    {system_instruction}
+    
+    Convert to valid JSON matching this structure:
+    {minified_schema}
+    
+    RULES:
+    1. Output ONLY valid JSON.
+    2. Auto-fill missing descriptions.
+    3. Ensure 'step' numbers are sequential integers starting at 1.
+    4. ALIGNMENT RULES:
+        - If A sends a SYNC message ("->") to B, B MUST start an activation at that step.
+        - If B sends a RETURN message ("-->") to A, B MUST end its activation at that step.
+        - Nested calls (A->B, B->C) must stack activations correctly.
+    5. 'activations' and 'fragments' must align with event steps.
+    """
+
+    genai.configure(api_key=api_key)
+    # Switch to stable flash model which often has better rate limits than experimental
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    
+    try:
+        response = call_gemini_with_retry(model, final_prompt)
+        cleaned_json = clean_json_output(response.text)
+        return cleaned_json
+    except Exception as e:
+        raise Exception(f"Gemini Conversion Failed: {str(e)}")
 
 
 def main():
@@ -478,38 +961,102 @@ def main():
                 tab_simple, tab_json = st.tabs(["Simple Mode", "Advanced JSON"])
                 
                 with tab_simple:
-                    st.caption("Edit graph structure using `Node A -> Node B` syntax.")
+                    is_sequence = (graph_type == "Sequence")
+                    st.caption("Edit structure using Simple DSL.")
+                    if is_sequence:
+                        st.info(
+                            """
+                            **Sequence Syntax Guide:**
+                            - **Sync Message:** `A -> B : Message` (Solid Line)
+                            - **Async Message:** `A ->> B : Message` (Open Arrow)
+                            - **Return Message:** `A --> B : Reply` (Dotted Line)
+                            - **Self Message:** `A -> A : Internal process`
+                            - **Alternative Flow:**
+                              ```
+                              alt Invalid Token
+                                A --> B : 401 Error
+                              end
+                              ```
+                            - **Activations:** `activate A` / `deactivate A`
+                            """
+                        )
+                    else:
+                        st.info("💡 **Syntax:** `Node A -> Node B : Label`")
                     
                     # 1. Convert Current JSON -> DSL for initial view
-                    # We use a key based on json hash or something to avoid loop? 
-                    # Simpler: Just regenerate DSL every time unless processed.
-                    # Buuut if user is typing, we don't want to overwrite their typing with json reload.
-                    # Streamlit handling:
-                    current_dsl = json_to_dsl(st.session_state.current_json_data)
+                    current_dsl = ""
+                    # Use a try-catch for safety during conversion
+                    try:
+                        if is_sequence:
+                             current_dsl = sequence_json_to_dsl(st.session_state.current_json_data)
+                        else:
+                             current_dsl = json_to_dsl(st.session_state.current_json_data)
+                    except Exception:
+                        current_dsl = ""
+                    
+                    # Dynamic key to prevent state cross-talk between modes
+                    text_area_key = f"dsl_input_{graph_type}"
                     
                     dsl_input = st.text_area(
-                        "Simple Graph Definition",
+                        "Simple Definition",
                         value=current_dsl,
                         height=750,
-                        key="dsl_input"
+                        key=text_area_key,
+                        help="Changes here will be processed by Gemini for Sequence Diagrams (Slower but Smarter)." if is_sequence else "Changes update instantly."
                     )
                     
+                     # Trigger update if input differs from the canonical DSL of the current JSON
                     if dsl_input != current_dsl:
                          # User Changed DSL -> Update JSON
                          try:
-                             new_json_from_dsl = dsl_to_json(dsl_input, st.session_state.current_json_data)
-                             st.session_state.current_json_data = new_json_from_dsl
+                             new_json_from_dsl = None
+                             if is_sequence:
+                                 # 1. Try Local Parse
+                                 new_json_from_dsl = sequence_dsl_to_json(dsl_input)
+                             else:
+                                 # For standard graphs, pass current_data to preserve metadata
+                                 new_json_from_dsl = dsl_to_json(dsl_input, st.session_state.current_json_data)
                              
-                             # Update HTML
-                             html_loader = load_html_template # Default
-                             # (Type inference logic if needed)
-                             html_template = html_loader()
-                             if html_template:
-                                new_html = inject_data_into_html(html_template, new_json_from_dsl)
-                                st.session_state.html_content = new_html
-                                st.rerun()
+                             # CRITICAL FIX: Only update if the logic actually changed the data structure
+                             # This prevents infinite loops where formatting differences (spaces etc) cause reruns.
+                             if new_json_from_dsl and new_json_from_dsl != st.session_state.current_json_data:
+                                st.session_state.current_json_data = new_json_from_dsl
+                                # Update HTML
+                                if graph_type == "Sequence":
+                                     html_loader = load_sequence_template
+                                elif graph_type == "Timeline":
+                                     html_loader = load_timeline_template
+                                else:
+                                     html_loader = load_html_template
+                                
+                                html_template = html_loader()
+                                if html_template:
+                                    new_html = inject_data_into_html(html_template, new_json_from_dsl)
+                                    st.session_state.html_content = new_html
+                                    st.rerun()
                          except Exception as e:
                              st.error(f"Error parsing DSL: {e}")
+
+                    # Add an AI "Magic Fix" button for complex requests or if user wants LLM help
+                    if is_sequence:
+                        if st.button("✨ AI Magic Fix / Regenerate", help="Use AI to rewrite the diagram based on your text (Slower but understands natural language)."):
+                            if not api_key:
+                                st.error("API Key required.")
+                            else:
+                                with st.spinner("🤖 Gemini is rewriting..."):
+                                    try:
+                                        # Use the robust generate function
+                                        ai_json = generate_json_from_dsl(dsl_input, api_key, "Sequence")
+                                        if ai_json and ai_json != st.session_state.current_json_data:
+                                            st.session_state.current_json_data = ai_json
+                                            # Update HTML
+                                            html_template = load_sequence_template()
+                                            if html_template:
+                                                new_html = inject_data_into_html(html_template, ai_json)
+                                                st.session_state.html_content = new_html
+                                                st.rerun()
+                                    except Exception as e:
+                                        st.error(f"AI Generation Failed: {e}")
 
                 with tab_json:
                     # Convert current JSON to string for the text area
@@ -526,19 +1073,22 @@ def main():
                     if edited_json_str != json_str:
                         try:
                             new_json_data = json.loads(edited_json_str)
-                            st.session_state.current_json_data = new_json_data
                             
-                            html_loader = load_html_template
-                            if "participants" in new_json_data and "events" in new_json_data:
-                                 html_loader = load_sequence_template
-                            elif "mermaid_syntax" in new_json_data:
-                                 html_loader = load_timeline_template
-                            
-                            html_template = html_loader()
-                            if html_template:
-                                new_html = inject_data_into_html(html_template, new_json_data)
-                                st.session_state.html_content = new_html
-                                st.rerun() 
+                            # Only update if semantically different
+                            if new_json_data != st.session_state.current_json_data:
+                                st.session_state.current_json_data = new_json_data
+                                
+                                html_loader = load_html_template
+                                if "participants" in new_json_data and "events" in new_json_data:
+                                     html_loader = load_sequence_template
+                                elif "mermaid_syntax" in new_json_data:
+                                     html_loader = load_timeline_template
+                                
+                                html_template = html_loader()
+                                if html_template:
+                                    new_html = inject_data_into_html(html_template, new_json_data)
+                                    st.session_state.html_content = new_html
+                                    st.rerun() 
                                 
                         except json.JSONDecodeError as e:
                             st.error(f"Invalid JSON: {e}")
