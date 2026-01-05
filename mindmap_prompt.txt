@@ -9,7 +9,7 @@ You may go up to 3-4 levels deep where appropriate.
 
 **JSON Generation Rules (Strict):**
 1. Output ONLY valid, raw JSON.
-2. Do NOT use Markdown code blocks (no ```json).
+2. Do NOT use Markdown code blocks (no ```json) to wrap the entire output.
 3. Do NOT include any text before or after the JSON.
 4. Ensure the JSON is parsable by standard libraries.
 
@@ -19,7 +19,7 @@ You may go up to 3-4 levels deep where appropriate.
 3. **Level 2+ (Sub-categories/Leaves):** Recursively break down complex categories into sub-categories. Ensure you reach 3-4 levels of depth where necessary.
 4. **Leaves:** The final nodes should be specific examples or facts.
 4. **Labels:** Keep `label` short (1-4 words).
-5. **Summaries:** Ensure the "summary" fields are detailed and informative.
+5. **Summaries:** Ensure the "summary" fields are detailed and informative. **You  should use Markdown syntax** (bold, italics, lists) WITHIN the JSON string values for summaries.
 
 **Schema Requirements:**
 Use this EXACT JSON structure.

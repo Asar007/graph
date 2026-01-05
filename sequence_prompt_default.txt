@@ -1,0 +1,94 @@
+Role: You are a System Architect. Your goal is to design a clear, logical sequence of interactions for a given process.
+
+Task: Generate a JSON object for the sequence: "[INSERT TOPIC HERE]".
+
+Rules:
+1. Participants: Identify key actors (type="Actor") and systems (type="Participant").
+2. Events: specific messages passed between participants.
+3. Activations: periods where a participant is active/processing.
+4. ids: Use simple, alphanumeric IDs (e.g., "user", "api") without spaces.
+5. Order: Events must be in chronological order.
+
+**Architectural Requirements (Must be implemented):**
+1.  **Rate Limiting:** The API Gateway must check for rate limits before forwarding to the Auth Service.
+2.  **Database Security:** The Database must return a `Salt` and `Password Hash`, not raw user data.
+3.  **Verification:** The Auth Service must perform a self-process to `Verify Hash (Bcrypt/Argon2)` before issuing tokens.
+4.  **Token Strategy:** Return both an `Access Token` (short-lived) and `Refresh Token` (HttpOnly Cookie).
+5.  **Client Handling:** The Client must explicitly `Store Tokens Securely` before redirecting.
+
+Mandatory Logic Requirements:
+1.  **Analyze the Domain:** specialized actors and systems relevant to the specific topic (e.g., if "Payment", use "Payment Gateway"; if "Upload", use "Virus Scanner").
+2.  **The "Happy Path":** Map the successful completion of the task.
+3.  **The "Unhappy Paths" (CRITICAL):** You MUST identify at least 2 distinct failure scenarios relevant to this specific process (e.g., "Validation Failed", "Timeout", "Insufficient Funds", "Resource Not Found") and include them as alternative branches.
+4.  **Chronology:** logical order. Checks must happen *before* the action.
+
+**Participants to Include:**
+* **User** (Actor)
+* **Client App** (Participant)
+* **API Gateway** (Participant)
+* **Auth Service** (Participant)
+* **User Database** (Participant)
+
+JSON Schema: Return ONLY valid JSON.
+```json
+{
+  "metadata": {
+  "title": "Sequence Diagram Title",
+    "summary": "Detailed summary (2-3 sentences)."
+  },
+  "participants": [
+    {
+      "id": "user",
+      "label": "Customer",
+      "type": "Actor", 
+      "description": "End user initiating the flow."
+    },
+    {
+      "id": "api",
+      "label": "API Gateway",
+      "type": "Participant",
+      "description": "Main entry point."
+    }
+  ],
+  "activations": [
+    {"participant": "api", "startStep": 1, "endStep": 2} 
+  ],
+  "fragments": [
+    {
+      "type": "alt",
+      "condition": "Invalid Token",
+      "startStep": 1,
+      "endStep": 2,
+      "label": "Alternative Flow"
+    }
+  ],
+  "events": [
+    {
+      "step": 1, 
+      "type": "message",
+      "source": "user",
+      "target": "api",
+      "label": "POST /login",
+      "arrowType": "solid",
+      "lineType": "solid"
+    },
+    {
+      "step": 2,
+      "type": "message",
+      "source": "api",
+      "target": "user",
+      "label": "200 OK (Token)",
+      "arrowType": "open_arrow", 
+      "lineType": "dotted" 
+    }
+  ]
+}
+```
+
+Requirements:
+1. **Strict JSON**: Output ONLY valid JSON code.
+2. **Actors vs Participants**: Use "Actor" type for humans (renders as stick figure) and "Participant" for systems (box).
+3. **Activations**: Include an `activations` array. `startStep` is the index (1-based) of the message starting activity, `endStep` is when it ends.
+4. **Fragments**: Use the `fragments` array to show logic (e.g., `alt`, `loop`, `opt`). `startStep` and `endStep` define the vertical range. 
+5. **Return Messages**: Use `arrowType: "open_arrow"` and `lineType: "dotted"` for responses.
+6. **Complexity**: Ensure at least 3 participants and logical activations.

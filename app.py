@@ -997,6 +997,77 @@ def render_live_editor(graph_type, api_key):
     else:
         st.info("Generate a graph to see the editor.")
 
+def save_prompt_callback(file_name, key):
+    try:
+        content = st.session_state[key]
+        with open(file_name, "w") as f:
+            f.write(content)
+        st.toast(f"Saved {file_name}!", icon="💾")
+    except Exception as e:
+        st.error(f"Error saving file: {e}")
+
+def reset_prompt_callback(file_name, key):
+    try:
+        default_file = file_name.replace(".txt", "_default.txt")
+        if os.path.exists(default_file):
+            with open(default_file, "r") as df:
+                default_content = df.read()
+            with open(file_name, "w") as f:
+                f.write(default_content)
+            
+            # Update session state
+            st.session_state[key] = default_content
+            st.toast(f"Reset {file_name} to default!", icon="🔄")
+        else:
+            st.error(f"Default file {default_file} not found.")
+    except Exception as e:
+        st.error(f"Error checking reset: {e}")
+
+def render_prompt_settings():
+    st.markdown("---")
+    with st.expander("Prompt Settings"):
+        prompt_files = {
+            "Graph Prompt": "json_only_prompt.txt",
+            "Mindmap Prompt": "mindmap_prompt.txt",
+            "Sequence Prompt": "sequence_prompt.txt",
+            "Timeline Prompt": "timeline_prompt.txt",
+            "Modification Prompt": "modification_prompt.txt", 
+            "Mindmap Mod Prompt": "mindmap_modification_prompt.txt"
+        }
+        
+        selected_prompt = st.selectbox("Select Prompt to Edit", list(prompt_files.keys()))
+        file_name = prompt_files[selected_prompt]
+        
+        if file_name:
+            # Load current content if widget not yet initialized
+            # (Streamlit handles persistence via key, but we need initial value)
+            current_content = ""
+            if os.path.exists(file_name):
+                 with open(file_name, "r") as f:
+                    current_content = f.read()
+            
+            # Key for the text area
+            ta_key = f"edit_{file_name}"
+            
+            # Initialize session state if not present to avoid "default value" warning
+            if ta_key not in st.session_state:
+                st.session_state[ta_key] = current_content
+            
+            st.text_area("Edit Prompt", height=300, key=ta_key)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.button("Save Changes", 
+                          key=f"save_{file_name}", 
+                          on_click=save_prompt_callback, 
+                          args=(file_name, ta_key))
+            
+            with col2:
+                st.button("Reset to Default", 
+                          key=f"reset_{file_name}", 
+                          on_click=reset_prompt_callback, 
+                          args=(file_name, ta_key))
+
 def main():
     # Initialize JSON data state to allow modifications
     if 'current_json_data' not in st.session_state:
@@ -1102,6 +1173,9 @@ def main():
                         else:
                             st.session_state.chat_messages.append({"role": "assistant", "content": f"Error: {error}"})
             st.rerun()
+
+        # Add Prompt Settings at the bottom of sidebar
+        render_prompt_settings()
 
     # --- Main Area ---
     st.title("Interactive Graph Generator")

@@ -10,8 +10,6 @@ Level 1 (Root): 1 Central Node (The Main Topic).
 
 Level 2 (Categories): 3-5 Major Categories (Direct children of Root).
 
-Level 3 (Leaves): 3-4 Specific items per Category (Children of Categories).
-
 No Cross-Linking: Do not connect Level 3 nodes to each other. Edges must only flow Parent -> Child. This prevents a "messy" graph layout.
 
 Consistency: Every ID listed in the hierarchy object MUST have a corresponding node in the nodes array and an edge in the edges array.
@@ -90,6 +88,6 @@ JSON Schema: Return ONLY valid JSON. Do not write markdown intro/outro text.
 ```
 
 Requirements:
-1.  **Strict JSON**: Output ONLY valid JSON code. No markdown text before or after (unless inside a code block).
-2.  **Rich Data**: Ensure the "summary" fields are detailed and informative.
+1.  **Strict JSON**: Output ONLY valid JSON code. No markdown text before or after the JSON block.
+2.  **Rich Data**: Ensure the "summary" and "description" fields are detailed. **You MAY use Markdown syntax** (bold, italics, lists, links) WITHIN the string values for these fields.
 3.  **Structure**: Create a logical hierarchy (Main Topic -> Categories -> Items). At least 15-20 nodes.

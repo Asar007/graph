@@ -10,6 +10,7 @@
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Embedded Styles -->
     <style>
@@ -1934,7 +1935,7 @@
                     <span class="detail-label">Summary:</span>
                     <button onclick="window.architectureViewer.enableEditMode('summary', '${nodeData.id}')" style="background:none; border:none; cursor:pointer; font-size:12px; color:#64B5F6;">✏️ Edit</button>
                 </div>
-                <p class="working-description" id="summary-text">${nodeData.summary || nodeData.description || 'No description available.'}</p>
+                <div class="working-description" id="summary-text">${marked.parse(nodeData.summary || nodeData.description || 'No description available.')}</div>
             </div>
         `;
 

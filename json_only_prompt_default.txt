@@ -1,0 +1,95 @@
+Role: You are a Knowledge Graph Architect. Your goal is to create a clean, structured, hierarchical dataset for an interactive visualization.
+
+Task: Generate a JSON object for the topic: "[INSERT TOPIC HERE]".
+
+Structural Rules (Crucial for Layout):
+
+Topology: Create a strict 3-Level Tree Structure:
+
+Level 1 (Root): 1 Central Node (The Main Topic).
+
+Level 2 (Categories): 3-5 Major Categories (Direct children of Root).
+
+Level 3 (Leaves): 3-4 Specific items per Category (Children of Categories).
+
+No Cross-Linking: Do not connect Level 3 nodes to each other. Edges must only flow Parent -> Child. This prevents a "messy" graph layout.
+
+Consistency: Every ID listed in the hierarchy object MUST have a corresponding node in the nodes array and an edge in the edges array.
+
+Color Coding: Use specific type values to visually distinguish levels:
+
+Root Node: type: "data"
+
+Category Nodes: type: "backend"
+
+Leaf Nodes: type: "frontend" or type: "utility"
+
+JSON Schema: Return ONLY valid JSON. Do not write markdown intro/outro text.
+```json
+{
+  "metadata": {
+    "projectName": "Project Title",
+    "description": "Short description of the visualization.",
+    "version": "1.0",
+    "author": "AI",
+    "topic": "slug-format",
+    "contentType": "educational"
+  },
+  "nodes": [
+    {
+      "id": "root-id",
+      "data": {
+        "label": "Main Topic Name",
+        "type": "data", 
+        "description": "Short description.",
+        "summary": "Detailed, informative summary (2-3 sentences) explaining the main topic concept."
+      }
+    },
+    {
+      "id": "category-id",
+      "data": {
+        "label": "Category Name",
+        "type": "backend", 
+        "description": "Short description of this category.",
+        "summary": "Detailed summary explaining what this category encompasses."
+      }
+    },
+    {
+      "id": "item-id",
+      "data": {
+        "label": "Specific Item Name",
+        "type": "frontend", 
+        "description": "Short description.",
+        "summary": "Detailed summary explaining this specific item.",
+        // You may add specific arrays relevant to the topic here
+        "characteristics": ["Trait 1", "Trait 2"],
+        "examples": ["Ex 1", "Ex 2"]
+      }
+    }
+  ],
+  "hierarchy": {
+    "root-id": ["category-1-id", "category-2-id"],
+    "category-1-id": ["item-a-id", "item-b-id"]
+  },
+  "edges": [
+    {
+      "id": "e1",
+      "source": "root-id",
+      "target": "category-1-id",
+      "type": "establishes"
+    },
+    {
+      "id": "e2",
+      "source": "category-1-id",
+      "target": "item-a-id",
+      "type": "involves"
+    }
+  ],
+  "details": {}
+}
+```
+
+Requirements:
+1.  **Strict JSON**: Output ONLY valid JSON code. No markdown text before or after (unless inside a code block).
+2.  **Rich Data**: Ensure the "summary" fields are detailed and informative.
+3.  **Structure**: Create a logical hierarchy (Main Topic -> Categories -> Items). At least 15-20 nodes.
