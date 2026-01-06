@@ -850,6 +850,105 @@ def generate_json_from_dsl(dsl_text, api_key, graph_type="Sequence"):
         raise Exception(f"Gemini Conversion Failed: {str(e)}")
 
 
+
+# --- AI Assistant Logic ---
+
+class GraphAssistant:
+    def __init__(self, api_key):
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.api_key = api_key
+
+    def _get_system_prompt(self, current_graph_context=None, graph_type="Graph", focused_context=None):
+        base_prompt = """
+        You are an advanced AI Data Visualization Assistant.
+        Your goal is to help the user understand information by creating or modifying diagrams, OR by explaining existing ones.
+        
+        You have two modes of operation:
+        1. **CONVERSATIONAL**: Answer questions, explain concepts, or discuss the current graph.
+        2. **ACTION**: Generate a new graph or Modify the existing one.
+        
+        Tool Use Protocol:
+        If the user wants to CREATE or CHANGE a visual, you must return a structured TOOL CALL.
+        If the user just wants to talk, return normal text.
+        
+        TOOL CALL FORMAT:
+        You must output a JSON block for actions:
+        ```json
+        {
+          "action": "GENERATE" | "MODIFY",
+          "target_type": "Graph" | "Mindmap" | "Sequence" | "Timeline" | null,
+          "topic_or_instruction": "..."
+        }
+        ```
+        
+        - Use "GENERATE" if the user asks for a new topic or a completely new diagram.
+        - Use "MODIFY" if the user asks to change, add, delete, or update the CURRENT diagram.
+        - Use "target_type" ONLY if the user explicitly asks to convert or switch to a different view (e.g., "Show as Mindmap"). Otherwise null.
+        """
+        
+        context_str = ""
+        if focused_context:
+             context_str = f"""
+            FOCUSED NODE/CONTEXT:
+            {json.dumps(focused_context, indent=2)}
+            
+            FULL GRAPH CONTEXT ({graph_type}):
+            {json.dumps(current_graph_context, indent=2)}
+            """
+        elif current_graph_context:
+            context_str = f"""
+            CURRENT GRAPH CONTEXT ({graph_type}):
+            {json.dumps(current_graph_context, indent=2)}
+            """
+        else:
+            context_str = "CURRENT GRAPH CONTEXT: None (No graph generated yet)."
+            
+        return f"{base_prompt}\n\n{context_str}"
+
+    def process_request(self, user_input, chat_history, current_graph_context=None, graph_type="Graph", focused_context=None):
+        """
+        Decides whether to chat or perform an action.
+        Returns: (response_text, action_dict)
+        """
+        system_instruction = self._get_system_prompt(current_graph_context, graph_type, focused_context)
+        
+        # Construct chat history for the model
+        messages = [
+            {"role": "user", "parts": [system_instruction]} 
+        ]
+        
+        # Add recent history (last 5 messages to avoid blowing context)
+        # Assuming chat_history is list of {"role": "user"|"assistant", "content": "..."}
+        if chat_history:
+            for msg in chat_history[-5:]:
+                 role = "model" if msg["role"] == "assistant" else "user"
+                 messages.append({"role": role, "parts": [str(msg["content"])]})
+                 
+        messages.append({"role": "user", "parts": [user_input]})
+        
+        try:
+            response = call_gemini_with_retry(self.model, messages[-1]['parts'][0]) 
+            
+            # Use a fresh chat session for the actual interaction to ensure clean state or use the direct prompt method
+            combined_prompt = f"{system_instruction}\n\nUSER INPUT: {user_input}"
+            response = call_gemini_with_retry(self.model, combined_prompt)
+            
+            text = response.text
+            
+            # Check for JSON tool call
+            action_data = clean_json_output(text)
+            
+            if action_data and "action" in action_data:
+                # It's an action!
+                return None, action_data
+            else:
+                # It's just a conversation response
+                return text, None
+                
+        except Exception as e:
+            return f"Error processing request: {e}", None
+
 def render_live_editor(graph_type, api_key):
     st.subheader("Live Editor")
     if st.session_state.current_json_data:
@@ -1095,13 +1194,11 @@ def main():
                 border-left: 1px solid #f0f2f6 !important;
             }
             
-            /* Fix the expand/collapse button position */
             [data-testid="stSidebarCollapsedControl"] {
                 left: unset !important;
                 right: 20px !important; 
             }
             
-            /* Main Content adjustments */
             .main .block-container {
                 max-width: 100%;
                 padding-right: 22rem; 
@@ -1123,8 +1220,35 @@ def main():
         if not api_key:
             st.warning("GOOGLE_API_KEY missing in .env")
             
-        # Graph Type Selector
-        graph_type = st.radio("Structure", ["Graph", "Mindmap", "Sequence", "Timeline"], horizontal=True, help="Choose 'Graph' for hierarchical flows, 'Mindmap' for radial brainstorming, 'Sequence' for interaction diagrams, or 'Timeline' for chronological events.")
+        # Graph Type Selector - Bound to Session State for Programmatic Switching
+        if "graph_type" not in st.session_state:
+            st.session_state.graph_type = "Graph"
+        
+        # Callback to sync widget -> state
+        def update_graph_type():
+            st.session_state.graph_type = st.session_state.graph_type_input
+
+        options = ["Graph", "Mindmap", "Sequence", "Timeline"]
+        curr_type = st.session_state.graph_type
+        try:
+            curr_idx = options.index(curr_type)
+        except ValueError:
+            curr_idx = 0
+            
+        # Use a separate key for the widget to allow us to modify session_state.graph_type programmatically
+        # without conflicting with the "widget instantiated" check.
+        st.radio(
+            "Structure", 
+            options, 
+            index=curr_idx,
+            horizontal=True, 
+            key="graph_type_input",
+            on_change=update_graph_type,
+            help="Choose 'Graph' for hierarchical flows, 'Mindmap' for radial brainstorming, 'Sequence' for interaction diagrams, or 'Timeline' for chronological events."
+        )
+        
+        # Ensure local variable is set
+        graph_type = st.session_state.graph_type
         
         # Chat Interface
         chat_container = st.container(height=700) 
@@ -1136,7 +1260,7 @@ def main():
                     st.markdown(msg["content"])
         
         # Chat Input
-        if prompt := st.chat_input("Type a topic or modification..."):
+        if prompt := st.chat_input("Ask a question or request a diagram..."):
              # Add user message to state
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
             
@@ -1148,30 +1272,66 @@ def main():
             if not api_key:
                  st.session_state.chat_messages.append({"role": "assistant", "content": "Error: API Key missing."})
             else:
+                # Initialize Assistant
+                assistant = GraphAssistant(api_key)
                 target_json = st.session_state.current_json_data
                 
-                if target_json is None:
-                    # Generate New
-                    with st.spinner(f"Generating '{prompt}' ({graph_type})..."):
-                        new_html, json_data, error = generate_graph(prompt, api_key, graph_type)
-                        if new_html:
-                            st.session_state.html_content = new_html
-                            st.session_state.current_json_data = json_data
-                            st.session_state.chat_messages.append({"role": "assistant", "content": f"Generated graph for: {prompt}"})
-                        else:
-                            error_msg = f"Error: {error}"
-                            st.error(error_msg) # Show globally
-                            st.session_state.chat_messages.append({"role": "assistant", "content": error_msg})
-                else:
-                    # Modify Existing
-                    with st.spinner("Modifying..."):
-                        new_html, json_data, error = modify_graph(target_json, prompt, api_key, graph_type)
-                        if new_html:
-                            st.session_state.html_content = new_html
-                            st.session_state.current_json_data = json_data # Update state
-                            st.session_state.chat_messages.append({"role": "assistant", "content": "Graph updated successfully!"})
-                        else:
-                            st.session_state.chat_messages.append({"role": "assistant", "content": f"Error: {error}"})
+                with st.spinner("Thinking..."):
+                    response_text, action_data = assistant.process_request(
+                        prompt, 
+                        st.session_state.chat_messages[:-1], 
+                        target_json, 
+                        graph_type
+                    )
+                
+                if action_data:
+                    action = action_data.get("action")
+                    instruction = action_data.get("topic_or_instruction")
+                    target_type = action_data.get("target_type")
+                    
+                    # Handle Type Switching
+                    if target_type and target_type in ["Graph", "Mindmap", "Sequence", "Timeline"]:
+                        if target_type != graph_type:
+                            st.session_state.graph_type = target_type
+                            graph_type = target_type # Update local var for immediate use
+                            st.toast(f"Switching to {target_type} mode...", icon="🔄")
+                    
+                    if action == "GENERATE":
+                        with st.status(f"Generating new {graph_type} for: {instruction}...", expanded=True) as status:
+                            new_html, json_data, error = generate_graph(instruction, api_key, graph_type)
+                            if new_html:
+                                st.session_state.html_content = new_html
+                                st.session_state.current_json_data = json_data
+                                completion_msg = f"Here is the {graph_type} regarding {instruction}. I can also explain it if you like!"
+                                st.session_state.chat_messages.append({"role": "assistant", "content": completion_msg})
+                                status.update(label="Graph Generated!", state="complete", expanded=False)
+                                st.rerun()
+                            else:
+                                error_msg = f"Generation Error: {error}"
+                                st.error(error_msg)
+                                st.session_state.chat_messages.append({"role": "assistant", "content": error_msg})
+                                status.update(label="Generation Failed", state="error")
+
+                    elif action == "MODIFY":
+                        with st.status(f"Modifying graph: {instruction}...", expanded=True) as status:
+                            new_html, json_data, error = modify_graph(target_json, instruction, api_key, graph_type)
+                            if new_html:
+                                st.session_state.html_content = new_html
+                                st.session_state.current_json_data = json_data
+                                completion_msg = f"Updated the graph: {instruction}."
+                                st.session_state.chat_messages.append({"role": "assistant", "content": completion_msg})
+                                status.update(label="Graph Updated!", state="complete", expanded=False)
+                                st.rerun()
+                            else:
+                                error_msg = f"Modification Error: {error}"
+                                st.session_state.chat_messages.append({"role": "assistant", "content": error_msg})
+                                status.update(label="Modification Failed", state="error")
+                
+                elif response_text:
+                    # Just conversational
+                    st.session_state.chat_messages.append({"role": "assistant", "content": response_text})
+                    st.rerun()
+
             st.rerun()
 
         # Add Prompt Settings at the bottom of sidebar
