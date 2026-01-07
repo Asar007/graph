@@ -10,6 +10,7 @@ from langchain_core.output_parsers import JsonOutputParser
 import time
 import difflib
 from streamlit_ace import st_ace
+import billing # Import Billing Module
 
 # Load environment variables
 load_dotenv(override=True)
@@ -678,10 +679,20 @@ def clean_json_output(text):
         return None
 
 def call_gemini_with_retry(model, prompt, max_retries=5, retry_delay=5):
-    """Executes a Gemini generation with robust rate-limit handling."""
+    """Executes a Gemini generation with robust rate-limit handling AND Billing Enforcement."""
+    
+    # 1. CHECK BUDGET
+    billing.check_budget_limit()
+    
     for attempt in range(max_retries):
         try:
-            return model.generate_content(prompt)
+            # 2. CALL API
+            response = model.generate_content(prompt)
+            
+            # 3. TRACK USAGE
+            billing.track_usage(response)
+            
+            return response
         except Exception as e:
             error_str = str(e)
             if "429" in error_str and attempt < max_retries - 1:
@@ -1219,6 +1230,15 @@ def main():
         
         if not api_key:
             st.warning("GOOGLE_API_KEY missing in .env")
+        else:
+            # Show Billing Info
+            try:
+                curr_cost, _ = billing.get_todays_cost()
+                st.metric("Daily Spend", f"${curr_cost:.4f}", f"Limit: ${billing.DAILY_BUDGET:.2f}")
+                if curr_cost >= billing.DAILY_BUDGET:
+                    st.error("Budget Limit Reached!")
+            except Exception:
+                pass
             
         # Graph Type Selector - Bound to Session State for Programmatic Switching
         if "graph_type" not in st.session_state:
